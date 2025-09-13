@@ -32,6 +32,52 @@ if 'processamento_concluido' not in st.session_state:
     st.session_state.processamento_concluido = False
 if 'dados_processados' not in st.session_state:
     st.session_state.dados_processados = None
+if 'logos_carregadas' not in st.session_state:
+    st.session_state.logos_carregadas = False
+
+# --------------------------
+# FUNÇÕES PARA LOGOS
+# --------------------------
+
+@st.cache_data
+def carregar_logos():
+    """Carrega as logos do repositório GitHub"""
+    logos = {}
+    
+    # URLs das logos no GitHub
+    urls_logos = {
+        'acafe': 'https://raw.githubusercontent.com/JulioFloripa/CorretorACAFE/main/logo-acafe.png',
+        'fleming': 'https://raw.githubusercontent.com/JulioFloripa/CorretorACAFE/main/logo_fleming.png'
+    }
+    
+    for nome, url in urls_logos.items():
+        try:
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                # Salvar logo localmente
+                logo_path = f"/tmp/logo_{nome}.png"
+                with open(logo_path, 'wb') as f:
+                    f.write(response.content)
+                logos[nome] = logo_path
+                
+                # Converter para base64 para uso na interface
+                logos[f'{nome}_b64'] = base64.b64encode(response.content).decode()
+            else:
+                st.warning(f"⚠️ Não foi possível carregar logo {nome}")
+                logos[nome] = None
+        except Exception as e:
+            st.warning(f"⚠️ Erro ao carregar logo {nome}: {str(e)}")
+            logos[nome] = None
+    
+    return logos
+
+# Carregar logos
+if not st.session_state.logos_carregadas:
+    with st.spinner("🔄 Carregando logos oficiais..."):
+        st.session_state.logos = carregar_logos()
+        st.session_state.logos_carregadas = True
+
+logos = st.session_state.logos
 
 # --------------------------
 # CONFIGURAÇÕES DE ESTILO
@@ -46,14 +92,21 @@ def load_css():
         background: linear-gradient(135deg, #f8fffe 0%, #e8f5f3 100%);
     }
     
-    /* Header customizado - CORRIGIDO */
+    /* Header customizado com logos */
     .header-acafe {
         background: linear-gradient(90deg, #2d5a3d 0%, #4a8c6a 100%);
-        padding: 2rem 1rem;
+        padding: 1.5rem;
         border-radius: 15px;
         margin-bottom: 2rem;
         box-shadow: 0 4px 15px rgba(45, 90, 61, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .header-content {
         text-align: center;
+        flex-grow: 1;
     }
     
     .header-acafe h1 {
@@ -69,6 +122,22 @@ def load_css():
         font-size: 1.2rem;
         margin-top: 0.5rem;
         font-style: italic;
+    }
+    
+    .logo-header {
+        width: 80px;
+        height: 80px;
+        background: white;
+        border-radius: 50%;
+        padding: 10px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+    
+    .logo-header img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        border-radius: 50%;
     }
     
     /* Botões customizados */
@@ -118,26 +187,29 @@ def load_css():
         border-top: 2px solid #e8f5f3;
         margin-top: 3rem;
     }
-    
-    /* Botão de reset */
-    .reset-button {
-        background: linear-gradient(45deg, #dc3545, #c82333);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 0.5rem 1rem;
-        font-weight: bold;
-        cursor: pointer;
-    }
     </style>
     """, unsafe_allow_html=True)
 
 def show_header():
-    """Mostra header customizado - CORRIGIDO"""
-    st.markdown("""
+    """Mostra header customizado com logos oficiais"""
+    # Preparar logos para o header
+    logo_acafe_html = ""
+    logo_fleming_html = ""
+    
+    if logos.get('acafe_b64'):
+        logo_acafe_html = f'<div class="logo-header"><img src="data:image/png;base64,{logos["acafe_b64"]}" alt="ACAFE"></div>'
+    
+    if logos.get('fleming_b64'):
+        logo_fleming_html = f'<div class="logo-header"><img src="data:image/png;base64,{logos["fleming_b64"]}" alt="Fleming"></div>'
+    
+    st.markdown(f"""
     <div class="header-acafe">
-        <h1>🎓 Corretor ACAFE Fleming</h1>
-        <p>Sistema Inteligente de Correção de Simulados</p>
+        {logo_acafe_html}
+        <div class="header-content">
+            <h1>Corretor ACAFE Fleming</h1>
+            <p>Sistema Inteligente de Correção de Simulados</p>
+        </div>
+        {logo_fleming_html}
     </div>
     """, unsafe_allow_html=True)
 
@@ -392,58 +464,48 @@ def gerar_graficos(nome, posicao, percentual, df_boletim, media_df, ranking_df, 
 class BoletimPDF(FPDF):
     def __init__(self):
         super().__init__()
-        self.logo_acafe_path = None
-        self.logo_fleming_path = None
-        self.setup_logos()
-    
-    def setup_logos(self):
-        """Configura as logos para uso no PDF"""
-        try:
-            # Salvar logos das imagens encontradas
-            self.logo_acafe_path = "/home/ubuntu/upload/search_images/kPLqwT1pnljr.jpeg"
-            self.logo_fleming_path = "/home/ubuntu/upload/search_images/9uRs8wwV5n9x.jpg"
-        except Exception as e:
-            pass  # Continuar sem logos se houver erro
+        self.logo_acafe_path = logos.get('acafe')
+        self.logo_fleming_path = logos.get('fleming')
     
     def header(self):
-        """Header melhorado com logos e design profissional"""
+        """Header melhorado com logos oficiais"""
         # Fundo verde no header
         self.set_fill_color(45, 90, 61)  # Verde ACAFE
-        self.rect(0, 0, 210, 40, 'F')
+        self.rect(0, 0, 210, 45, 'F')
         
         # Logo ACAFE (esquerda)
         if self.logo_acafe_path and os.path.exists(self.logo_acafe_path):
             try:
-                self.image(self.logo_acafe_path, 15, 8, 25)
-            except:
+                self.image(self.logo_acafe_path, 15, 8, 30)
+            except Exception as e:
                 pass
         
         # Logo Fleming (direita)
         if self.logo_fleming_path and os.path.exists(self.logo_fleming_path):
             try:
-                self.image(self.logo_fleming_path, 170, 8, 25)
-            except:
+                self.image(self.logo_fleming_path, 165, 8, 30)
+            except Exception as e:
                 pass
         
         # Título central
-        self.set_font("Arial", "B", 18)
+        self.set_font("Arial", "B", 20)
         self.set_text_color(255, 255, 255)  # Branco
-        self.set_y(12)
+        self.set_y(15)
         self.cell(0, 8, "SIMULADO ACAFE", ln=True, align="C")
         
-        self.set_font("Arial", "B", 14)
+        self.set_font("Arial", "B", 16)
         self.cell(0, 8, "COLEGIO FLEMING", ln=True, align="C")
         
-        self.set_font("Arial", "", 10)
+        self.set_font("Arial", "", 12)
         self.cell(0, 6, "Relatorio Individual de Desempenho", ln=True, align="C")
         
         # Linha decorativa
         self.set_draw_color(255, 255, 255)
-        self.set_line_width(0.5)
-        self.line(20, 38, 190, 38)
+        self.set_line_width(1)
+        self.line(20, 42, 190, 42)
         
         self.set_text_color(0, 0, 0)  # Voltar para preto
-        self.ln(15)
+        self.ln(18)
 
     def add_aluno_info(self, nome, posicao, percentual, media_turma, aluno_data=None):
         """Informações do aluno com design melhorado"""
@@ -451,75 +513,75 @@ class BoletimPDF(FPDF):
         self.set_fill_color(240, 248, 245)  # Verde muito claro
         self.set_draw_color(45, 90, 61)  # Verde escuro
         self.set_line_width(1)
-        self.rect(10, self.get_y(), 190, 45, 'DF')
+        self.rect(10, self.get_y(), 190, 50, 'DF')
         
         # Título da seção
-        self.set_font("Arial", "B", 14)
+        self.set_font("Arial", "B", 16)
         self.set_text_color(45, 90, 61)
-        self.set_y(self.get_y() + 5)
+        self.set_y(self.get_y() + 8)
         self.cell(0, 8, "INFORMACOES DO ESTUDANTE", ln=True, align="C")
         
         # Informações em duas colunas
-        y_start = self.get_y()
+        y_start = self.get_y() + 3
         
         # Coluna esquerda
-        self.set_font("Arial", "B", 11)
+        self.set_font("Arial", "B", 12)
         self.set_text_color(0, 0, 0)
         self.set_y(y_start)
         self.set_x(15)
-        self.cell(90, 6, f"Nome: {nome}", ln=True)
+        self.cell(90, 7, f"Nome: {nome}", ln=True)
         
         self.set_x(15)
-        self.cell(90, 6, f"Posicao no Ranking: {posicao}º lugar", ln=True)
+        self.cell(90, 7, f"Posicao no Ranking: {posicao}º lugar", ln=True)
         
         if aluno_data and 'Sede' in aluno_data:
             self.set_x(15)
-            self.cell(90, 6, f"Sede: {aluno_data['Sede']}", ln=True)
+            self.cell(90, 7, f"Sede: {aluno_data['Sede']}", ln=True)
         
         # Coluna direita
         self.set_y(y_start)
         self.set_x(110)
-        self.cell(90, 6, f"Nota Individual: {percentual:.1f}%", ln=True)
+        self.cell(90, 7, f"Nota Individual: {percentual:.1f}%", ln=True)
         
         self.set_x(110)
-        self.cell(90, 6, f"Media da Turma: {media_turma:.1f}%", ln=True)
+        self.cell(90, 7, f"Media da Turma: {media_turma:.1f}%", ln=True)
         
         # Diferença com cor
         diferenca = percentual - media_turma
         self.set_x(110)
         if diferenca > 0:
             self.set_text_color(0, 128, 0)  # Verde
-            self.cell(90, 6, f"Diferenca: +{diferenca:.1f}% (acima)", ln=True)
+            self.cell(90, 7, f"Diferenca: +{diferenca:.1f}% (acima)", ln=True)
         else:
             self.set_text_color(255, 0, 0)  # Vermelho
-            self.cell(90, 6, f"Diferenca: {diferenca:.1f}% (abaixo)", ln=True)
+            self.cell(90, 7, f"Diferenca: {diferenca:.1f}% (abaixo)", ln=True)
         
         self.set_text_color(0, 0, 0)  # Voltar para preto
-        self.ln(15)
+        self.ln(18)
 
     def add_table(self, df):
         """Tabela melhorada com cores alternadas"""
         # Título da tabela
-        self.set_font("Arial", "B", 12)
+        self.set_font("Arial", "B", 14)
         self.set_text_color(45, 90, 61)
-        self.cell(0, 8, "DESEMPENHO POR DISCIPLINA", ln=True, align="C")
-        self.ln(3)
+        self.cell(0, 10, "DESEMPENHO POR DISCIPLINA", ln=True, align="C")
+        self.ln(5)
         
         # Cabeçalho da tabela
         self.set_fill_color(45, 90, 61)  # Verde ACAFE
         self.set_text_color(255, 255, 255)  # Branco
-        self.set_font("Arial", "B", 9)
+        self.set_font("Arial", "B", 10)
         
-        self.cell(45, 8, "Disciplina", 1, 0, 'C', True)
-        self.cell(20, 8, "Acertos", 1, 0, 'C', True)
-        self.cell(20, 8, "Total", 1, 0, 'C', True)
-        self.cell(25, 8, "Nota (%)", 1, 0, 'C', True)
-        self.cell(25, 8, "Media (%)", 1, 0, 'C', True)
-        self.cell(30, 8, "Diferenca", 1, 0, 'C', True)
+        self.cell(50, 10, "Disciplina", 1, 0, 'C', True)
+        self.cell(25, 10, "Acertos", 1, 0, 'C', True)
+        self.cell(25, 10, "Total", 1, 0, 'C', True)
+        self.cell(30, 10, "Nota (%)", 1, 0, 'C', True)
+        self.cell(30, 10, "Media (%)", 1, 0, 'C', True)
+        self.cell(30, 10, "Diferenca", 1, 0, 'C', True)
         self.ln()
         
         # Dados da tabela
-        self.set_font("Arial", "", 8)
+        self.set_font("Arial", "", 9)
         
         for i, (_, row) in enumerate(df.iterrows()):
             # Alternar cores das linhas
@@ -529,34 +591,34 @@ class BoletimPDF(FPDF):
                 self.set_fill_color(255, 255, 255)  # Branco
             
             self.set_text_color(0, 0, 0)
-            disciplina = str(row["Disciplina"])[:20]  # Limitar tamanho
-            self.cell(45, 7, disciplina, 1, 0, 'L', True)
-            self.cell(20, 7, str(row["Acertos"]), 1, 0, 'C', True)
-            self.cell(20, 7, str(row["Total"]), 1, 0, 'C', True)
-            self.cell(25, 7, f"{row['%']:.1f}%", 1, 0, 'C', True)
-            self.cell(25, 7, f"{row['Media Turma']:.1f}%", 1, 0, 'C', True)
+            disciplina = str(row["Disciplina"])[:22]  # Limitar tamanho
+            self.cell(50, 8, disciplina, 1, 0, 'L', True)
+            self.cell(25, 8, str(row["Acertos"]), 1, 0, 'C', True)
+            self.cell(25, 8, str(row["Total"]), 1, 0, 'C', True)
+            self.cell(30, 8, f"{row['%']:.1f}%", 1, 0, 'C', True)
+            self.cell(30, 8, f"{row['Media Turma']:.1f}%", 1, 0, 'C', True)
             
             diferenca = row['Diferenca']
             texto_dif = f"+{diferenca:.1f}%" if diferenca > 0 else f"{diferenca:.1f}%"
-            self.cell(30, 7, texto_dif, 1, 0, 'C', True)
+            self.cell(30, 8, texto_dif, 1, 0, 'C', True)
             self.ln()
         
         self.set_text_color(0, 0, 0)  # Voltar para preto
-        self.ln(10)
+        self.ln(12)
 
     def add_image(self, path, largura=180, titulo=""):
         """Adiciona imagem com título"""
         if path and os.path.exists(path):
             try:
                 if titulo:
-                    self.set_font("Arial", "B", 11)
+                    self.set_font("Arial", "B", 12)
                     self.set_text_color(45, 90, 61)
-                    self.cell(0, 8, titulo, ln=True, align="C")
-                    self.ln(2)
+                    self.cell(0, 10, titulo, ln=True, align="C")
+                    self.ln(3)
                 
                 x_pos = (210 - largura) / 2
                 self.image(path, x=x_pos, w=largura)
-                self.ln(10)
+                self.ln(12)
                 
             except Exception as e:
                 self.set_font("Arial", "", 10)
@@ -566,19 +628,19 @@ class BoletimPDF(FPDF):
 
     def footer(self):
         """Footer melhorado"""
-        self.set_y(-20)
+        self.set_y(-25)
         
         # Linha decorativa
         self.set_draw_color(45, 90, 61)
-        self.set_line_width(0.5)
+        self.set_line_width(0.8)
         self.line(20, self.get_y(), 190, self.get_y())
         
-        self.set_font("Arial", "", 8)
+        self.set_font("Arial", "", 9)
         self.set_text_color(100, 100, 100)
-        self.ln(3)
+        self.ln(5)
         self.cell(0, 5, f"Pagina {self.page_no()}", 0, 0, 'C')
-        self.ln(3)
-        self.cell(0, 5, "Sistema de Correcao ACAFE - Colegio Fleming", 0, 0, 'C')
+        self.ln(4)
+        self.cell(0, 5, "Sistema de Correcao ACAFE - Colegio Fleming | Logos Oficiais", 0, 0, 'C')
 
 # --------------------------
 # APLICAR CSS E HEADER
@@ -592,6 +654,12 @@ show_header()
 
 with st.sidebar:
     st.markdown("### 🎓 **Instruções ACAFE**")
+    
+    # Mostrar status das logos
+    if logos.get('acafe') and logos.get('fleming'):
+        st.success("✅ Logos oficiais carregadas!")
+    else:
+        st.warning("⚠️ Algumas logos não foram carregadas")
     
     with st.expander("📊 **Aba RESPOSTAS**", expanded=False):
         st.markdown("""
@@ -863,7 +931,7 @@ else:
                         # Gráficos
                         barras, radar, dist, rank = gerar_graficos(nome, posicao, percentual, df_boletim, media_df, ranking_df, tmpdir)
 
-                        # PDF
+                        # PDF COM LOGOS OFICIAIS
                         try:
                             pdf = BoletimPDF()
                             pdf.add_page()
@@ -910,7 +978,7 @@ else:
                         f.read(), 
                         "boletins_acafe_fleming.zip", 
                         "application/zip",
-                        help=f"Arquivo contém {total_alunos} boletins individuais em PDF com gráficos",
+                        help=f"Arquivo contém {total_alunos} boletins individuais em PDF com logos oficiais",
                         use_container_width=True
                     )
                 
@@ -929,7 +997,7 @@ st.markdown("""
 <div class="footer">
     <p><strong>Corretor ACAFE - Colégio Fleming</strong></p>
     <p>Desenvolvido com ❤️ para facilitar a correção de simulados</p>
-    <p style="font-size: 0.8rem; opacity: 0.7;">Versão 3.1 - ESTÁVEL | Header Corrigido | Sem Loop</p>
+    <p style="font-size: 0.8rem; opacity: 0.7;">Versão 4.0 - LOGOS OFICIAIS | Interface e PDFs com identidade visual completa</p>
 </div>
 """, unsafe_allow_html=True)
 
