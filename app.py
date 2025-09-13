@@ -18,6 +18,22 @@ import matplotlib
 matplotlib.use('Agg')
 
 # --------------------------
+# CONFIGURAÇÕES INICIAIS
+# --------------------------
+st.set_page_config(
+    page_title="Corretor ACAFE Fleming", 
+    layout="wide",
+    page_icon="🎓",
+    initial_sidebar_state="expanded"
+)
+
+# Inicializar estado da sessão
+if 'processamento_concluido' not in st.session_state:
+    st.session_state.processamento_concluido = False
+if 'dados_processados' not in st.session_state:
+    st.session_state.dados_processados = None
+
+# --------------------------
 # CONFIGURAÇÕES DE ESTILO
 # --------------------------
 
@@ -30,59 +46,29 @@ def load_css():
         background: linear-gradient(135deg, #f8fffe 0%, #e8f5f3 100%);
     }
     
-    /* Header customizado */
-    .header-container {
+    /* Header customizado - CORRIGIDO */
+    .header-acafe {
         background: linear-gradient(90deg, #2d5a3d 0%, #4a8c6a 100%);
         padding: 2rem 1rem;
         border-radius: 15px;
         margin-bottom: 2rem;
         box-shadow: 0 4px 15px rgba(45, 90, 61, 0.2);
+        text-align: center;
     }
     
-    .header-title {
+    .header-acafe h1 {
         color: white;
         font-size: 2.5rem;
         font-weight: bold;
-        text-align: center;
         margin: 0;
         text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
     }
     
-    .header-subtitle {
+    .header-acafe p {
         color: #e8f5f3;
         font-size: 1.2rem;
-        text-align: center;
         margin-top: 0.5rem;
         font-style: italic;
-    }
-    
-    /* Logo ACAFE */
-    .logo-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin-bottom: 1rem;
-    }
-    
-    .acafe-logo {
-        width: 80px;
-        height: 80px;
-        background: white;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-        margin-right: 1rem;
-    }
-    
-    /* Sidebar customizada */
-    .css-1d391kg {
-        background: linear-gradient(180deg, #2d5a3d 0%, #4a8c6a 100%);
-    }
-    
-    .css-1d391kg .css-1v0mbdj {
-        color: white;
     }
     
     /* Botões customizados */
@@ -100,14 +86,6 @@ def load_css():
     .stButton > button:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 10px rgba(45, 90, 61, 0.4);
-    }
-    
-    /* Upload area customizada */
-    .uploadedFile {
-        background: linear-gradient(135deg, #e8f5f3, #d4f1ea);
-        border: 2px dashed #4a8c6a;
-        border-radius: 15px;
-        padding: 2rem;
     }
     
     /* Métricas customizadas */
@@ -131,13 +109,6 @@ def load_css():
         border-left: 4px solid #4a8c6a;
     }
     
-    /* Tabelas customizadas */
-    .dataframe {
-        border-radius: 10px;
-        overflow: hidden;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    
     /* Footer */
     .footer {
         text-align: center;
@@ -147,54 +118,28 @@ def load_css():
         border-top: 2px solid #e8f5f3;
         margin-top: 3rem;
     }
+    
+    /* Botão de reset */
+    .reset-button {
+        background: linear-gradient(45deg, #dc3545, #c82333);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        font-weight: bold;
+        cursor: pointer;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-def create_acafe_logo():
-    """Cria logo ACAFE em SVG"""
-    logo_svg = """
-    <svg width="60" height="60" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="50" cy="50" r="45" fill="#2d5a3d" stroke="white" stroke-width="3"/>
-        <path d="M25 35 L50 25 L75 35 L75 65 L50 75 L25 65 Z" fill="white" opacity="0.9"/>
-        <text x="50" y="45" text-anchor="middle" fill="#2d5a3d" font-family="Arial, sans-serif" font-size="12" font-weight="bold">ACAFE</text>
-        <text x="50" y="60" text-anchor="middle" fill="#2d5a3d" font-family="Arial, sans-serif" font-size="8">FLEMING</text>
-    </svg>
-    """
-    return logo_svg
-
 def show_header():
-    """Mostra header customizado"""
-    st.markdown(f"""
-    <div class="header-container">
-        <div class="logo-container">
-            <div class="acafe-logo">
-                {create_acafe_logo()}
-            </div>
-            <div>
-                <h1 class="header-title">Corretor ACAFE Fleming</h1>
-                <p class="header-subtitle">Sistema Inteligente de Correção de Simulados</p>
-            </div>
-        </div>
+    """Mostra header customizado - CORRIGIDO"""
+    st.markdown("""
+    <div class="header-acafe">
+        <h1>🎓 Corretor ACAFE Fleming</h1>
+        <p>Sistema Inteligente de Correção de Simulados</p>
     </div>
     """, unsafe_allow_html=True)
-
-# --------------------------
-# CONFIGURAÇÕES INICIAIS
-# --------------------------
-st.set_page_config(
-    page_title="Corretor ACAFE Fleming", 
-    layout="wide",
-    page_icon="🎓",
-    initial_sidebar_state="expanded"
-)
-
-# Aplicar CSS customizado
-load_css()
-
-# Mostrar header
-show_header()
-
-st.markdown("### 📚 Faça upload da planilha com as abas **RESPOSTAS** e **GABARITO**")
 
 # --------------------------
 # FUNÇÕES DE VALIDAÇÃO
@@ -237,7 +182,7 @@ def validar_arquivo_excel(dados):
     return len(erros) == 0, erros
 
 def validar_dados_gabarito(gabarito):
-    """Valida os dados do gabarito - CORRIGIDO para permitir questões de línguas diferentes"""
+    """Valida os dados do gabarito"""
     erros = []
     
     # Verificar questões duplicadas APENAS dentro da mesma disciplina
@@ -270,11 +215,11 @@ def validar_dados_gabarito(gabarito):
     return len(erros) == 0, erros
 
 # --------------------------
-# FUNÇÕES AUXILIARES - CORRIGIDAS
+# FUNÇÕES AUXILIARES
 # --------------------------
 
 def corrigir_respostas(df_respostas, gabarito, mapa_disciplinas):
-    """Corrige as respostas dos alunos baseado no gabarito - CORRIGIDO PARA FORMATO REAL"""
+    """Corrige as respostas dos alunos baseado no gabarito"""
     respostas = df_respostas.copy()
     
     # Para cada questão no gabarito, verificar se há resposta do aluno
@@ -282,7 +227,7 @@ def corrigir_respostas(df_respostas, gabarito, mapa_disciplinas):
         questao = row_gabarito["Questão"]
         resposta_correta = row_gabarito["Resposta"]
         
-        # CORREÇÃO: O formato real é "Questão 01", "Questão 02", etc.
+        # O formato real é "Questão 01", "Questão 02", etc.
         col = f"Questão {int(questao):02d}"  # Formato com zero à esquerda
         
         if col in respostas.columns:
@@ -458,7 +403,7 @@ class BoletimPDF(FPDF):
             self.logo_acafe_path = "/home/ubuntu/upload/search_images/kPLqwT1pnljr.jpeg"
             self.logo_fleming_path = "/home/ubuntu/upload/search_images/9uRs8wwV5n9x.jpg"
         except Exception as e:
-            st.warning(f"Aviso: Não foi possível carregar as logos: {e}")
+            pass  # Continuar sem logos se houver erro
     
     def header(self):
         """Header melhorado com logos e design profissional"""
@@ -502,7 +447,7 @@ class BoletimPDF(FPDF):
 
     def add_aluno_info(self, nome, posicao, percentual, media_turma, aluno_data=None):
         """Informações do aluno com design melhorado"""
-        # Caixa principal com gradiente simulado
+        # Caixa principal
         self.set_fill_color(240, 248, 245)  # Verde muito claro
         self.set_draw_color(45, 90, 61)  # Verde escuro
         self.set_line_width(1)
@@ -552,45 +497,8 @@ class BoletimPDF(FPDF):
         self.set_text_color(0, 0, 0)  # Voltar para preto
         self.ln(15)
 
-    def add_performance_summary(self, percentual, posicao, total_alunos):
-        """Adiciona resumo de performance com indicadores visuais"""
-        # Caixa de performance
-        self.set_fill_color(248, 255, 254)  # Verde muito claro
-        self.set_draw_color(74, 140, 106)  # Verde médio
-        self.rect(10, self.get_y(), 190, 25, 'DF')
-        
-        self.set_font("Arial", "B", 12)
-        self.set_text_color(45, 90, 61)
-        self.set_y(self.get_y() + 3)
-        self.cell(0, 6, "RESUMO DE PERFORMANCE", ln=True, align="C")
-        
-        # Indicadores
-        y_pos = self.get_y()
-        
-        # Performance geral
-        if percentual >= 80:
-            status = "EXCELENTE"
-            cor = (0, 128, 0)
-        elif percentual >= 70:
-            status = "BOM"
-            cor = (255, 165, 0)
-        elif percentual >= 60:
-            status = "REGULAR"
-            cor = (255, 140, 0)
-        else:
-            status = "PRECISA MELHORAR"
-            cor = (255, 0, 0)
-        
-        self.set_font("Arial", "B", 10)
-        self.set_text_color(*cor)
-        self.set_y(y_pos)
-        self.cell(0, 8, f"STATUS: {status} | POSICAO: {posicao}/{total_alunos}", ln=True, align="C")
-        
-        self.set_text_color(0, 0, 0)
-        self.ln(8)
-
     def add_table(self, df):
-        """Tabela melhorada com cores alternadas e design profissional"""
+        """Tabela melhorada com cores alternadas"""
         # Título da tabela
         self.set_font("Arial", "B", 12)
         self.set_text_color(45, 90, 61)
@@ -602,12 +510,12 @@ class BoletimPDF(FPDF):
         self.set_text_color(255, 255, 255)  # Branco
         self.set_font("Arial", "B", 9)
         
-        # Larguras das colunas
-        col_widths = [45, 20, 20, 25, 25, 25, 30]
-        headers = ["Disciplina", "Acertos", "Total", "Nota (%)", "Media (%)", "Diferenca", "Status"]
-        
-        for i, header in enumerate(headers):
-            self.cell(col_widths[i], 8, header, 1, 0, 'C', True)
+        self.cell(45, 8, "Disciplina", 1, 0, 'C', True)
+        self.cell(20, 8, "Acertos", 1, 0, 'C', True)
+        self.cell(20, 8, "Total", 1, 0, 'C', True)
+        self.cell(25, 8, "Nota (%)", 1, 0, 'C', True)
+        self.cell(25, 8, "Media (%)", 1, 0, 'C', True)
+        self.cell(30, 8, "Diferenca", 1, 0, 'C', True)
         self.ln()
         
         # Dados da tabela
@@ -620,60 +528,24 @@ class BoletimPDF(FPDF):
             else:
                 self.set_fill_color(255, 255, 255)  # Branco
             
-            # Disciplina
             self.set_text_color(0, 0, 0)
             disciplina = str(row["Disciplina"])[:20]  # Limitar tamanho
-            self.cell(col_widths[0], 7, disciplina, 1, 0, 'L', True)
+            self.cell(45, 7, disciplina, 1, 0, 'L', True)
+            self.cell(20, 7, str(row["Acertos"]), 1, 0, 'C', True)
+            self.cell(20, 7, str(row["Total"]), 1, 0, 'C', True)
+            self.cell(25, 7, f"{row['%']:.1f}%", 1, 0, 'C', True)
+            self.cell(25, 7, f"{row['Media Turma']:.1f}%", 1, 0, 'C', True)
             
-            # Acertos e Total
-            self.cell(col_widths[1], 7, str(row["Acertos"]), 1, 0, 'C', True)
-            self.cell(col_widths[2], 7, str(row["Total"]), 1, 0, 'C', True)
-            
-            # Nota com cor baseada na performance
-            nota = row['%']
-            if nota >= 80:
-                self.set_text_color(0, 128, 0)  # Verde
-            elif nota >= 60:
-                self.set_text_color(255, 140, 0)  # Laranja
-            else:
-                self.set_text_color(255, 0, 0)  # Vermelho
-            
-            self.cell(col_widths[3], 7, f"{nota:.1f}%", 1, 0, 'C', True)
-            
-            # Média da turma
-            self.set_text_color(0, 0, 0)
-            self.cell(col_widths[4], 7, f"{row['Media Turma']:.1f}%", 1, 0, 'C', True)
-            
-            # Diferença com cor
             diferenca = row['Diferenca']
-            if diferenca > 0:
-                self.set_text_color(0, 128, 0)  # Verde
-                texto_dif = f"+{diferenca:.1f}%"
-            else:
-                self.set_text_color(255, 0, 0)  # Vermelho
-                texto_dif = f"{diferenca:.1f}%"
-            
-            self.cell(col_widths[5], 7, texto_dif, 1, 0, 'C', True)
-            
-            # Status
-            if nota >= 80:
-                status = "Otimo"
-                self.set_text_color(0, 128, 0)
-            elif nota >= 60:
-                status = "Bom"
-                self.set_text_color(255, 140, 0)
-            else:
-                status = "Melhorar"
-                self.set_text_color(255, 0, 0)
-            
-            self.cell(col_widths[6], 7, status, 1, 0, 'C', True)
+            texto_dif = f"+{diferenca:.1f}%" if diferenca > 0 else f"{diferenca:.1f}%"
+            self.cell(30, 7, texto_dif, 1, 0, 'C', True)
             self.ln()
         
         self.set_text_color(0, 0, 0)  # Voltar para preto
         self.ln(10)
 
     def add_image(self, path, largura=180, titulo=""):
-        """Adiciona imagem com título e moldura"""
+        """Adiciona imagem com título"""
         if path and os.path.exists(path):
             try:
                 if titulo:
@@ -682,14 +554,7 @@ class BoletimPDF(FPDF):
                     self.cell(0, 8, titulo, ln=True, align="C")
                     self.ln(2)
                 
-                # Moldura para a imagem
                 x_pos = (210 - largura) / 2
-                y_pos = self.get_y()
-                
-                self.set_draw_color(45, 90, 61)
-                self.set_line_width(0.5)
-                
-                # Imagem
                 self.image(path, x=x_pos, w=largura)
                 self.ln(10)
                 
@@ -716,28 +581,23 @@ class BoletimPDF(FPDF):
         self.cell(0, 5, "Sistema de Correcao ACAFE - Colegio Fleming", 0, 0, 'C')
 
 # --------------------------
-# SIDEBAR CUSTOMIZADA
+# APLICAR CSS E HEADER
+# --------------------------
+load_css()
+show_header()
+
+# --------------------------
+# SIDEBAR
 # --------------------------
 
 with st.sidebar:
     st.markdown("### 🎓 **Instruções ACAFE**")
-    
-    st.markdown("""
-    <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 10px; margin: 1rem 0;">
-    <h4 style="color: white; margin-top: 0;">📋 Formato do Excel:</h4>
-    </div>
-    """, unsafe_allow_html=True)
     
     with st.expander("📊 **Aba RESPOSTAS**", expanded=False):
         st.markdown("""
         - **ID**: Número único do aluno
         - **Nome**: Nome completo
         - **Questão 01, Questão 02...**: Respostas (A, B, C, D, E)
-        
-        *Exemplo:*
-        | ID | Nome | Questão 01 | Questão 02 |
-        |----|------|------------|------------|
-        | 1 | João | A | B |
         """)
     
     with st.expander("📝 **Aba GABARITO**", expanded=False):
@@ -745,13 +605,6 @@ with st.sidebar:
         - **Questão**: Número da questão
         - **Resposta**: Resposta correta (A-E)
         - **Disciplina**: Nome da matéria
-        
-        *Exemplo:*
-        | Questão | Resposta | Disciplina |
-        |---------|----------|------------|
-        | 1 | A | Matemática |
-        | 57 | B | Inglês |
-        | 57 | C | Espanhol |
         """)
     
     st.markdown("### 📊 **Estatísticas**")
@@ -771,156 +624,25 @@ with st.sidebar:
 # INTERFACE PRINCIPAL
 # --------------------------
 
-# Upload do arquivo
-arquivo = st.file_uploader(
-    "📎 **Selecione o arquivo Excel**", 
-    type=["xlsx"], 
-    help="Arquivo deve conter as abas 'RESPOSTAS' e 'GABARITO'",
-    key="file_uploader"
-)
-
-if arquivo:
-    try:
-        # Mostrar progresso
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        
-        status_text.success("📖 Lendo arquivo Excel...")
-        progress_bar.progress(10)
-        
-        # Ler arquivo Excel
-        dados = pd.read_excel(arquivo, sheet_name=None)
-        
-        status_text.success("✅ Validando estrutura do arquivo...")
-        progress_bar.progress(20)
-        
-        # Validar arquivo
-        valido, erros = validar_arquivo_excel(dados)
-        if not valido:
-            st.error("**🚨 Problemas encontrados no arquivo:**")
-            for erro in erros:
-                st.error(erro)
-            st.stop()
-        
-        respostas = dados["RESPOSTAS"]
-        gabarito = dados["GABARITO"]
-        
-        # Validar gabarito
-        gabarito_valido, erros_gabarito = validar_dados_gabarito(gabarito)
-        if not gabarito_valido:
-            st.error("**🚨 Problemas encontrados no gabarito:**")
-            for erro in erros_gabarito:
-                st.error(erro)
-            st.stop()
-        
-        status_text.success("📊 Processando dados...")
-        progress_bar.progress(30)
-        
-        # Mostrar preview dos dados
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("#### 📋 **Preview - Respostas**")
-            st.dataframe(respostas.head(), use_container_width=True)
-        
-        with col2:
-            st.markdown("#### 📝 **Preview - Gabarito**")
-            st.dataframe(gabarito.head(), use_container_width=True)
-        
-        # Estatísticas
-        total_alunos = len(respostas)
-        total_questoes = len(gabarito)
-        disciplinas = gabarito['Disciplina'].unique()
-        total_disciplinas = len(disciplinas)
-        
-        # Mostrar estatísticas principais
-        st.markdown("### 📊 **Estatísticas do Simulado**")
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.markdown("""
-            <div class="metric-container">
-                <h3 style="color: #2d5a3d; margin: 0;">👥 {}</h3>
-                <p style="margin: 0; color: #666;">Alunos</p>
-            </div>
-            """.format(total_alunos), unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown("""
-            <div class="metric-container">
-                <h3 style="color: #2d5a3d; margin: 0;">❓ {}</h3>
-                <p style="margin: 0; color: #666;">Questões</p>
-            </div>
-            """.format(total_questoes), unsafe_allow_html=True)
-        
-        with col3:
-            st.markdown("""
-            <div class="metric-container">
-                <h3 style="color: #2d5a3d; margin: 0;">📚 {}</h3>
-                <p style="margin: 0; color: #666;">Disciplinas</p>
-            </div>
-            """.format(total_disciplinas), unsafe_allow_html=True)
-        
-        # Processar dados
-        status_text.success("🔄 Corrigindo respostas...")
-        progress_bar.progress(40)
-        
-        # Mapeamento disciplinas - CORRIGIDO para lidar com questões de línguas
-        mapa_disciplinas = {}
-        for disciplina in gabarito['Disciplina'].unique():
-            if pd.isna(disciplina):
-                continue
-            questoes = gabarito[gabarito['Disciplina'] == disciplina]['Questão'].tolist()
-            mapa_disciplinas[disciplina] = questoes
-
-        respostas_corr = corrigir_respostas(respostas, gabarito, mapa_disciplinas)
-        
-        status_text.success("📈 Calculando ranking...")
-        progress_bar.progress(50)
-
-        # Ranking - CORRIGIDO para calcular percentual corretamente
-        percentuais = []
-        questoes_unicas = gabarito['Questão'].unique()  # Usar questões únicas
-        
-        for i, row in respostas_corr.iterrows():
-            acertos_tot = 0
-            for questao in questoes_unicas:
-                col_ok = f"Q{int(questao)}_OK"
-                if col_ok in row and row[col_ok]:
-                    acertos_tot += 1
-            
-            percentual = acertos_tot / len(questoes_unicas) if len(questoes_unicas) > 0 else 0
-            percentuais.append(percentual)
-        
-        respostas_corr["Percentual"] = percentuais
-
-        ranking_df = respostas_corr[["ID", "Nome", "Percentual"]].sort_values("Percentual", ascending=False).reset_index(drop=True)
-        ranking_df["Posição"] = ranking_df.index + 1
-        ranking_df["Nota (%)"] = (ranking_df["Percentual"] * 100).round(1)
-        media_turma = ranking_df["Percentual"].mean() * 100
-        
-        # Atualizar estatísticas
-        with col4:
-            st.markdown("""
-            <div class="metric-container">
-                <h3 style="color: #2d5a3d; margin: 0;">📈 {:.1f}%</h3>
-                <p style="margin: 0; color: #666;">Média Geral</p>
-            </div>
-            """.format(media_turma), unsafe_allow_html=True)
-
-        # Salvar estatísticas
-        st.session_state.stats = {
-            'total_alunos': total_alunos,
-            'total_questoes': total_questoes,
-            'total_disciplinas': total_disciplinas,
-            'media_geral': media_turma
-        }
+# Botão de reset se processamento foi concluído
+if st.session_state.processamento_concluido:
+    st.success("✅ **Processamento concluído com sucesso!**")
+    
+    if st.button("🔄 **Processar Novo Arquivo**", type="primary"):
+        st.session_state.processamento_concluido = False
+        st.session_state.dados_processados = None
+        st.rerun()
+    
+    # Mostrar dados processados se existirem
+    if st.session_state.dados_processados:
+        dados_proc = st.session_state.dados_processados
         
         # Mostrar ranking
         st.markdown("### 🏆 **Ranking da Turma**")
         
         # Top 3 destacado
         col1, col2, col3 = st.columns(3)
-        top3 = ranking_df.head(3)
+        top3 = dados_proc['ranking_df'].head(3)
         
         if len(top3) >= 1:
             with col1:
@@ -952,121 +674,262 @@ if arquivo:
                 </div>
                 """, unsafe_allow_html=True)
         
-        # Tabela completa do ranking
+        # Tabela do ranking
         st.dataframe(
-            ranking_df[["Posição", "Nome", "Nota (%)"]].head(10), 
+            dados_proc['ranking_df'][["Posição", "Nome", "Nota (%)"]].head(10), 
             use_container_width=True,
             hide_index=True
         )
         
-        status_text.success("📊 Calculando médias por disciplina...")
-        progress_bar.progress(60)
-
         # Médias por disciplina
-        media_disciplinas = []
-        for disc, questoes in mapa_disciplinas.items():
-            acertos = []
-            for _, row in respostas_corr.iterrows():
-                acertos_disc = sum([row.get(f"Q{int(q)}_OK", False) for q in questoes])
-                acertos.append(acertos_disc / len(questoes) if len(questoes) > 0 else 0)
-            media_disciplinas.append((disc, round(np.mean(acertos)*100, 1)))
-        media_df = pd.DataFrame(media_disciplinas, columns=["Disciplina", "%"])
-        
-        # Mostrar médias por disciplina
         st.markdown("### 📊 **Médias por Disciplina**")
-        st.dataframe(media_df, use_container_width=True, hide_index=True)
-        
-        status_text.success("📄 Gerando boletins individuais...")
-        progress_bar.progress(70)
+        st.dataframe(dados_proc['media_df'], use_container_width=True, hide_index=True)
 
-        # Gerar boletins
-        with tempfile.TemporaryDirectory() as tmpdir:
-            zip_path = os.path.join(tmpdir, "boletins.zip")
+else:
+    # Interface de upload
+    st.markdown("### 📚 Faça upload da planilha com as abas **RESPOSTAS** e **GABARITO**")
+    
+    arquivo = st.file_uploader(
+        "📎 **Selecione o arquivo Excel**", 
+        type=["xlsx"], 
+        help="Arquivo deve conter as abas 'RESPOSTAS' e 'GABARITO'",
+        key="file_uploader"
+    )
+
+    if arquivo:
+        try:
+            # Mostrar progresso
+            progress_bar = st.progress(0)
+            status_text = st.empty()
             
-            with zipfile.ZipFile(zip_path, "w") as zipf:
-                total_alunos = len(respostas_corr)
+            status_text.success("📖 Lendo arquivo Excel...")
+            progress_bar.progress(10)
+            
+            # Ler arquivo Excel
+            dados = pd.read_excel(arquivo, sheet_name=None)
+            
+            status_text.success("✅ Validando estrutura do arquivo...")
+            progress_bar.progress(20)
+            
+            # Validar arquivo
+            valido, erros = validar_arquivo_excel(dados)
+            if not valido:
+                st.error("**🚨 Problemas encontrados no arquivo:**")
+                for erro in erros:
+                    st.error(erro)
+                st.stop()
+            
+            respostas = dados["RESPOSTAS"]
+            gabarito = dados["GABARITO"]
+            
+            # Validar gabarito
+            gabarito_valido, erros_gabarito = validar_dados_gabarito(gabarito)
+            if not gabarito_valido:
+                st.error("**🚨 Problemas encontrados no gabarito:**")
+                for erro in erros_gabarito:
+                    st.error(erro)
+                st.stop()
+            
+            status_text.success("📊 Processando dados...")
+            progress_bar.progress(30)
+            
+            # Estatísticas
+            total_alunos = len(respostas)
+            total_questoes = len(gabarito)
+            disciplinas = gabarito['Disciplina'].unique()
+            total_disciplinas = len(disciplinas)
+            
+            # Mostrar estatísticas principais
+            st.markdown("### 📊 **Estatísticas do Simulado**")
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.markdown(f"""
+                <div class="metric-container">
+                    <h3 style="color: #2d5a3d; margin: 0;">👥 {total_alunos}</h3>
+                    <p style="margin: 0; color: #666;">Alunos</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                st.markdown(f"""
+                <div class="metric-container">
+                    <h3 style="color: #2d5a3d; margin: 0;">❓ {total_questoes}</h3>
+                    <p style="margin: 0; color: #666;">Questões</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col3:
+                st.markdown(f"""
+                <div class="metric-container">
+                    <h3 style="color: #2d5a3d; margin: 0;">📚 {total_disciplinas}</h3>
+                    <p style="margin: 0; color: #666;">Disciplinas</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Processar dados
+            status_text.success("🔄 Corrigindo respostas...")
+            progress_bar.progress(40)
+            
+            # Mapeamento disciplinas
+            mapa_disciplinas = {}
+            for disciplina in gabarito['Disciplina'].unique():
+                if pd.isna(disciplina):
+                    continue
+                questoes = gabarito[gabarito['Disciplina'] == disciplina]['Questão'].tolist()
+                mapa_disciplinas[disciplina] = questoes
+
+            respostas_corr = corrigir_respostas(respostas, gabarito, mapa_disciplinas)
+            
+            status_text.success("📈 Calculando ranking...")
+            progress_bar.progress(50)
+
+            # Ranking
+            percentuais = []
+            questoes_unicas = gabarito['Questão'].unique()
+            
+            for i, row in respostas_corr.iterrows():
+                acertos_tot = 0
+                for questao in questoes_unicas:
+                    col_ok = f"Q{int(questao)}_OK"
+                    if col_ok in row and row[col_ok]:
+                        acertos_tot += 1
                 
-                for i, aluno in respostas_corr.iterrows():
-                    # Atualizar progresso
-                    progresso = 70 + (i / total_alunos) * 25
-                    progress_bar.progress(int(progresso))
-                    status_text.success(f"📄 Gerando boletim: {aluno['Nome']} ({i+1}/{total_alunos})")
+                percentual = acertos_tot / len(questoes_unicas) if len(questoes_unicas) > 0 else 0
+                percentuais.append(percentual)
+            
+            respostas_corr["Percentual"] = percentuais
+
+            ranking_df = respostas_corr[["ID", "Nome", "Percentual"]].sort_values("Percentual", ascending=False).reset_index(drop=True)
+            ranking_df["Posição"] = ranking_df.index + 1
+            ranking_df["Nota (%)"] = (ranking_df["Percentual"] * 100).round(1)
+            media_turma = ranking_df["Percentual"].mean() * 100
+            
+            # Atualizar estatísticas
+            with col4:
+                st.markdown(f"""
+                <div class="metric-container">
+                    <h3 style="color: #2d5a3d; margin: 0;">📈 {media_turma:.1f}%</h3>
+                    <p style="margin: 0; color: #666;">Média Geral</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # Salvar estatísticas
+            st.session_state.stats = {
+                'total_alunos': total_alunos,
+                'total_questoes': total_questoes,
+                'total_disciplinas': total_disciplinas,
+                'media_geral': media_turma
+            }
+            
+            status_text.success("📊 Calculando médias por disciplina...")
+            progress_bar.progress(60)
+
+            # Médias por disciplina
+            media_disciplinas = []
+            for disc, questoes in mapa_disciplinas.items():
+                acertos = []
+                for _, row in respostas_corr.iterrows():
+                    acertos_disc = sum([row.get(f"Q{int(q)}_OK", False) for q in questoes])
+                    acertos.append(acertos_disc / len(questoes) if len(questoes) > 0 else 0)
+                media_disciplinas.append((disc, round(np.mean(acertos)*100, 1)))
+            media_df = pd.DataFrame(media_disciplinas, columns=["Disciplina", "%"])
+            
+            status_text.success("📄 Gerando boletins individuais...")
+            progress_bar.progress(70)
+
+            # Gerar boletins
+            with tempfile.TemporaryDirectory() as tmpdir:
+                zip_path = os.path.join(tmpdir, "boletins.zip")
+                
+                with zipfile.ZipFile(zip_path, "w") as zipf:
+                    total_alunos = len(respostas_corr)
                     
-                    nome = aluno["Nome"].replace(" ", "_").replace("/", "_")
-                    posicao = int(ranking_df.loc[ranking_df["ID"] == aluno["ID"], "Posição"].iloc[0])
-                    percentual = aluno["Percentual"] * 100
-
-                    resultados = resultados_disciplina(aluno, mapa_disciplinas)
-                    df_boletim = pd.DataFrame(resultados, columns=["Disciplina", "Acertos", "Total", "%"])
-                    df_boletim["Media Turma"] = media_df["%"]
-                    df_boletim["Diferenca"] = (df_boletim["%"] - media_df["%"]).round(1)
-
-                    # Gráficos
-                    barras, radar, dist, rank = gerar_graficos(nome, posicao, percentual, df_boletim, media_df, ranking_df, tmpdir)
-
-                    # PDF MELHORADO
-                    try:
-                        pdf = BoletimPDF()
-                        pdf.add_page()
+                    for i, aluno in respostas_corr.iterrows():
+                        # Atualizar progresso
+                        progresso = 70 + (i / total_alunos) * 25
+                        progress_bar.progress(int(progresso))
+                        status_text.success(f"📄 Gerando boletim: {aluno['Nome']} ({i+1}/{total_alunos})")
                         
-                        # Informações do aluno com dados extras
-                        aluno_data = {'Sede': aluno.get('Sede', 'N/A')}
-                        pdf.add_aluno_info(aluno["Nome"], posicao, percentual, media_turma, aluno_data)
-                        
-                        # Resumo de performance
-                        pdf.add_performance_summary(percentual, posicao, total_alunos)
-                        
-                        # Tabela melhorada
-                        pdf.add_table(df_boletim)
-                        
-                        # Gráficos com títulos
-                        if barras:
-                            pdf.add_image(barras, titulo="DESEMPENHO POR DISCIPLINA")
-                        if radar:
-                            pdf.add_image(radar, titulo="GRAFICO RADAR - COMPARACAO COM A TURMA")
-                        if dist:
-                            pdf.add_image(dist, titulo="DISTRIBUICAO DAS NOTAS DA TURMA")
-                        if rank:
-                            pdf.add_image(rank, titulo="POSICAO NO RANKING GERAL")
+                        nome = aluno["Nome"].replace(" ", "_").replace("/", "_")
+                        posicao = int(ranking_df.loc[ranking_df["ID"] == aluno["ID"], "Posição"].iloc[0])
+                        percentual = aluno["Percentual"] * 100
 
-                        pdf_path = os.path.join(tmpdir, f"Boletim_{nome}.pdf")
-                        pdf.output(pdf_path)
-                        zipf.write(pdf_path, f"Boletim_{nome}.pdf")
-                    
-                    except Exception as e:
-                        st.warning(f"⚠️ Erro ao gerar PDF para {aluno['Nome']}: {str(e)}")
-                        continue
+                        resultados = resultados_disciplina(aluno, mapa_disciplinas)
+                        df_boletim = pd.DataFrame(resultados, columns=["Disciplina", "Acertos", "Total", "%"])
+                        df_boletim["Media Turma"] = media_df["%"]
+                        df_boletim["Diferenca"] = (df_boletim["%"] - media_df["%"]).round(1)
 
-            status_text.success("✅ Processamento concluído!")
-            progress_bar.progress(100)
-            
-            # Botão de download estilizado
-            with open(zip_path, "rb") as f:
-                st.markdown("### 🎉 **Boletins Prontos!**")
-                st.download_button(
-                    "📥 **Baixar Todos os Boletins (ZIP)**", 
-                    f.read(), 
-                    "boletins_acafe_fleming.zip", 
-                    "application/zip",
-                    help=f"Arquivo contém {total_alunos} boletins individuais em PDF com gráficos",
-                    use_container_width=True
-                )
-            
-            st.balloons()
-            st.success(f"🎊 **{total_alunos} boletins gerados com sucesso!**")
-            
-    except Exception as e:
-        st.error(f"❌ **Erro durante o processamento:** {str(e)}")
-        with st.expander("🔍 **Detalhes técnicos do erro**"):
-            st.code(traceback.format_exc())
-        st.info("💡 **Dica:** Verifique se o arquivo está no formato correto e tente novamente.")
+                        # Gráficos
+                        barras, radar, dist, rank = gerar_graficos(nome, posicao, percentual, df_boletim, media_df, ranking_df, tmpdir)
+
+                        # PDF
+                        try:
+                            pdf = BoletimPDF()
+                            pdf.add_page()
+                            
+                            # Informações do aluno
+                            aluno_data = {'Sede': aluno.get('Sede', 'N/A')}
+                            pdf.add_aluno_info(aluno["Nome"], posicao, percentual, media_turma, aluno_data)
+                            
+                            # Tabela
+                            pdf.add_table(df_boletim)
+                            
+                            # Gráficos
+                            if barras:
+                                pdf.add_image(barras, titulo="DESEMPENHO POR DISCIPLINA")
+                            if radar:
+                                pdf.add_image(radar, titulo="GRAFICO RADAR - COMPARACAO COM A TURMA")
+                            if dist:
+                                pdf.add_image(dist, titulo="DISTRIBUICAO DAS NOTAS DA TURMA")
+                            if rank:
+                                pdf.add_image(rank, titulo="POSICAO NO RANKING GERAL")
+
+                            pdf_path = os.path.join(tmpdir, f"Boletim_{nome}.pdf")
+                            pdf.output(pdf_path)
+                            zipf.write(pdf_path, f"Boletim_{nome}.pdf")
+                        
+                        except Exception as e:
+                            st.warning(f"⚠️ Erro ao gerar PDF para {aluno['Nome']}: {str(e)}")
+                            continue
+
+                status_text.success("✅ Processamento concluído!")
+                progress_bar.progress(100)
+                
+                # Salvar dados processados
+                st.session_state.dados_processados = {
+                    'ranking_df': ranking_df,
+                    'media_df': media_df
+                }
+                
+                # Botão de download
+                with open(zip_path, "rb") as f:
+                    st.markdown("### 🎉 **Boletins Prontos!**")
+                    st.download_button(
+                        "📥 **Baixar Todos os Boletins (ZIP)**", 
+                        f.read(), 
+                        "boletins_acafe_fleming.zip", 
+                        "application/zip",
+                        help=f"Arquivo contém {total_alunos} boletins individuais em PDF com gráficos",
+                        use_container_width=True
+                    )
+                
+                # Marcar como concluído
+                st.session_state.processamento_concluido = True
+                st.balloons()
+                st.success(f"🎊 **{total_alunos} boletins gerados com sucesso!**")
+                
+        except Exception as e:
+            st.error(f"❌ **Erro durante o processamento:** {str(e)}")
+            with st.expander("🔍 **Detalhes técnicos do erro**"):
+                st.code(traceback.format_exc())
 
 # Footer
 st.markdown("""
 <div class="footer">
     <p><strong>Corretor ACAFE - Colégio Fleming</strong></p>
     <p>Desenvolvido com ❤️ para facilitar a correção de simulados</p>
-    <p style="font-size: 0.8rem; opacity: 0.7;">Versão 3.0 - PDF PROFISSIONAL | Logos e Layout Melhorado</p>
+    <p style="font-size: 0.8rem; opacity: 0.7;">Versão 3.1 - ESTÁVEL | Header Corrigido | Sem Loop</p>
 </div>
 """, unsafe_allow_html=True)
 
