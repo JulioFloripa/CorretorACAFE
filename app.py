@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from fpdf import FPDF
+from fpdf import FPDF, XPos, YPos
 import tempfile
 import zipfile
 import os
@@ -12,6 +12,10 @@ import base64
 from PIL import Image
 import requests
 from io import BytesIO
+import openpyxl
+from openpyxl.styles import PatternFill, Font, Alignment, Protection
+from openpyxl.worksheet.protection import SheetProtection
+from openpyxl.data_validation import DataValidation
 
 # Configurar matplotlib para usar backend não-interativo
 import matplotlib
@@ -63,10 +67,8 @@ def carregar_logos():
                 # Converter para base64 para uso na interface
                 logos[f'{nome}_b64'] = base64.b64encode(response.content).decode()
             else:
-                st.warning(f"⚠️ Não foi possível carregar logo {nome}")
                 logos[nome] = None
         except Exception as e:
-            st.warning(f"⚠️ Erro ao carregar logo {nome}: {str(e)}")
             logos[nome] = None
     
     return logos
@@ -78,6 +80,170 @@ if not st.session_state.logos_carregadas:
         st.session_state.logos_carregadas = True
 
 logos = st.session_state.logos
+
+# --------------------------
+# FUNÇÃO PARA CRIAR TEMPLATE EXCEL
+# --------------------------
+
+@st.cache_data
+def criar_template_excel():
+    """Cria template Excel com formatação ACAFE"""
+    
+    # Criar workbook
+    wb = openpyxl.Workbook()
+    
+    # Cores tema ACAFE
+    cor_verde_acafe = "2D5A3D"
+    cor_verde_claro = "E8F5F3"
+    cor_branco = "FFFFFF"
+    
+    # ===== ABA RESPOSTAS =====
+    ws_respostas = wb.active
+    ws_respostas.title = "RESPOSTAS"
+    
+    # Cabeçalhos da aba RESPOSTAS
+    headers_respostas = ["ID", "Nome", "Sede"] + [f"Questão {i:02d}" for i in range(1, 71)]
+    
+    # Aplicar cabeçalhos
+    for col, header in enumerate(headers_respostas, 1):
+        cell = ws_respostas.cell(row=1, column=col, value=header)
+        cell.fill = PatternFill(start_color=cor_verde_acafe, end_color=cor_verde_acafe, fill_type="solid")
+        cell.font = Font(color=cor_branco, bold=True)
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    
+    # Dados de exemplo
+    exemplos_respostas = [
+        [1, "João Silva Santos", "CRICIÚMA"] + ["A"] * 70,
+        [2, "Maria Oliveira Costa", "TUBARÃO"] + ["B"] * 70,
+        [3, "Pedro Souza Lima", "ARARANGUÁ"] + ["C"] * 70
+    ]
+    
+    for row_idx, exemplo in enumerate(exemplos_respostas, 2):
+        for col_idx, valor in enumerate(exemplo, 1):
+            cell = ws_respostas.cell(row=row_idx, column=col_idx, value=valor)
+            if row_idx % 2 == 0:
+                cell.fill = PatternFill(start_color=cor_verde_claro, end_color=cor_verde_claro, fill_type="solid")
+    
+    # Validação de dados para respostas (A, B, C, D, E)
+    dv = DataValidation(type="list", formula1='"A,B,C,D,E"', allow_blank=True)
+    dv.error = "Por favor, insira apenas A, B, C, D ou E"
+    dv.errorTitle = "Entrada Inválida"
+    ws_respostas.add_data_validation(dv)
+    
+    # Aplicar validação nas colunas de questões
+    for col in range(4, 74):  # Colunas D até BU (questões 01-70)
+        dv.add(f"{openpyxl.utils.get_column_letter(col)}2:{openpyxl.utils.get_column_letter(col)}1000")
+    
+    # Ajustar largura das colunas
+    ws_respostas.column_dimensions['A'].width = 8   # ID
+    ws_respostas.column_dimensions['B'].width = 25  # Nome
+    ws_respostas.column_dimensions['C'].width = 15  # Sede
+    for col in range(4, 74):
+        ws_respostas.column_dimensions[openpyxl.utils.get_column_letter(col)].width = 4
+    
+    # ===== ABA GABARITO =====
+    ws_gabarito = wb.create_sheet("GABARITO")
+    
+    # Cabeçalhos da aba GABARITO
+    headers_gabarito = ["Questão", "Resposta", "Disciplina"]
+    
+    for col, header in enumerate(headers_gabarito, 1):
+        cell = ws_gabarito.cell(row=1, column=col, value=header)
+        cell.fill = PatternFill(start_color=cor_verde_acafe, end_color=cor_verde_acafe, fill_type="solid")
+        cell.font = Font(color=cor_branco, bold=True)
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    
+    # Exemplo de gabarito
+    disciplinas = ["Matemática", "Português", "História", "Geografia", "Biologia", "Física", "Química", "Inglês", "Espanhol"]
+    exemplos_gabarito = []
+    
+    for i in range(1, 71):
+        if i <= 56:
+            disciplina = disciplinas[(i-1) % 7]  # Distribui entre as primeiras 7 disciplinas
+        else:
+            # Questões 57-70 são de línguas (Inglês e Espanhol)
+            if i % 2 == 1:
+                disciplina = "Inglês"
+            else:
+                disciplina = "Espanhol"
+        
+        resposta = ["A", "B", "C", "D", "E"][(i-1) % 5]
+        exemplos_gabarito.append([i, resposta, disciplina])
+    
+    for row_idx, exemplo in enumerate(exemplos_gabarito, 2):
+        for col_idx, valor in enumerate(exemplo, 1):
+            cell = ws_gabarito.cell(row=row_idx, column=col_idx, value=valor)
+            if row_idx % 2 == 0:
+                cell.fill = PatternFill(start_color=cor_verde_claro, end_color=cor_verde_claro, fill_type="solid")
+    
+    # Validação para respostas do gabarito
+    dv_gabarito = DataValidation(type="list", formula1='"A,B,C,D,E"', allow_blank=False)
+    dv_gabarito.error = "Por favor, insira apenas A, B, C, D ou E"
+    dv_gabarito.errorTitle = "Entrada Inválida"
+    ws_gabarito.add_data_validation(dv_gabarito)
+    dv_gabarito.add("B2:B1000")
+    
+    # Ajustar largura das colunas
+    ws_gabarito.column_dimensions['A'].width = 12  # Questão
+    ws_gabarito.column_dimensions['B'].width = 12  # Resposta
+    ws_gabarito.column_dimensions['C'].width = 20  # Disciplina
+    
+    # ===== ABA INSTRUÇÕES =====
+    ws_instrucoes = wb.create_sheet("INSTRUÇÕES")
+    
+    instrucoes_texto = [
+        ["TEMPLATE SIMULADO ACAFE - COLÉGIO FLEMING", ""],
+        ["", ""],
+        ["INSTRUÇÕES DE USO:", ""],
+        ["", ""],
+        ["1. ABA RESPOSTAS:", ""],
+        ["   • Preencha o ID único de cada aluno", ""],
+        ["   • Insira o nome completo do aluno", ""],
+        ["   • Indique a sede (CRICIÚMA, TUBARÃO, etc.)", ""],
+        ["   • Preencha as respostas nas colunas Questão 01 a 70", ""],
+        ["   • Use apenas as letras: A, B, C, D, E", ""],
+        ["", ""],
+        ["2. ABA GABARITO:", ""],
+        ["   • Questão: Número da questão (1 a 70)", ""],
+        ["   • Resposta: Resposta correta (A, B, C, D, E)", ""],
+        ["   • Disciplina: Nome da matéria", ""],
+        ["", ""],
+        ["3. QUESTÕES DE LÍNGUAS:", ""],
+        ["   • Questões 57-70 podem ser Inglês OU Espanhol", ""],
+        ["   • O sistema permite questões com mesmo número", ""],
+        ["   • para disciplinas diferentes", ""],
+        ["", ""],
+        ["4. VALIDAÇÃO:", ""],
+        ["   • Células têm validação automática", ""],
+        ["   • Só aceita respostas válidas (A-E)", ""],
+        ["   • Formatação tema ACAFE aplicada", ""],
+        ["", ""],
+        ["DESENVOLVIDO PARA COLÉGIO FLEMING", ""],
+        ["Sistema de Correção ACAFE v4.0", ""]
+    ]
+    
+    for row_idx, (texto, _) in enumerate(instrucoes_texto, 1):
+        cell = ws_instrucoes.cell(row=row_idx, column=1, value=texto)
+        if "TEMPLATE" in texto or "INSTRUÇÕES" in texto or "DESENVOLVIDO" in texto:
+            cell.font = Font(bold=True, size=14, color=cor_verde_acafe)
+        elif texto.startswith(("1.", "2.", "3.", "4.")):
+            cell.font = Font(bold=True, color=cor_verde_acafe)
+        else:
+            cell.font = Font(color="333333")
+    
+    ws_instrucoes.column_dimensions['A'].width = 50
+    
+    # Proteger planilha (opcional - desabilitado para facilitar edição)
+    # ws_respostas.protection = SheetProtection(password="acafe2024")
+    # ws_gabarito.protection = SheetProtection(password="acafe2024")
+    
+    # Salvar em bytes
+    from io import BytesIO
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    
+    return buffer.getvalue()
 
 # --------------------------
 # CONFIGURAÇÕES DE ESTILO
@@ -287,45 +453,49 @@ def validar_dados_gabarito(gabarito):
     return len(erros) == 0, erros
 
 # --------------------------
-# FUNÇÕES AUXILIARES
+# FUNÇÕES AUXILIARES OTIMIZADAS
 # --------------------------
 
-def corrigir_respostas(df_respostas, gabarito, mapa_disciplinas):
-    """Corrige as respostas dos alunos baseado no gabarito"""
+@st.cache_data
+def corrigir_respostas_otimizado(df_respostas, gabarito, mapa_disciplinas):
+    """Corrige as respostas dos alunos baseado no gabarito - VERSÃO OTIMIZADA"""
     respostas = df_respostas.copy()
     
-    # Para cada questão no gabarito, verificar se há resposta do aluno
-    for _, row_gabarito in gabarito.iterrows():
-        questao = row_gabarito["Questão"]
-        resposta_correta = row_gabarito["Resposta"]
-        
-        # O formato real é "Questão 01", "Questão 02", etc.
-        col = f"Questão {int(questao):02d}"  # Formato com zero à esquerda
+    # Criar dicionário de gabarito para acesso rápido
+    gabarito_dict = {}
+    for _, row in gabarito.iterrows():
+        questao = int(row["Questão"])
+        resposta_correta = str(row["Resposta"]).strip().upper()
+        gabarito_dict[questao] = resposta_correta
+    
+    # Processar todas as questões de uma vez (vetorizado)
+    for questao, resposta_correta in gabarito_dict.items():
+        col = f"Questão {questao:02d}"
+        col_ok = f"Q{questao}_OK"
         
         if col in respostas.columns:
-            # Comparar resposta do aluno com gabarito (ignorar case e espaços)
-            respostas[f"Q{int(questao)}_OK"] = (
-                respostas[col].astype(str).str.strip().str.upper() == 
-                str(resposta_correta).strip().upper()
+            # Comparação vetorizada
+            respostas[col_ok] = (
+                respostas[col].astype(str).str.strip().str.upper() == resposta_correta
             )
         else:
-            # Se não há coluna para essa questão, marcar como errado
-            respostas[f"Q{int(questao)}_OK"] = False
+            respostas[col_ok] = False
     
     return respostas
 
-def resultados_disciplina(linha, mapa_disciplinas):
-    """Calcula os resultados por disciplina para um aluno"""
+def resultados_disciplina_otimizado(linha, mapa_disciplinas):
+    """Calcula os resultados por disciplina para um aluno - OTIMIZADO"""
     resultados = []
     for disc, questoes in mapa_disciplinas.items():
-        acertos = sum([linha.get(f"Q{int(q)}_OK", False) for q in questoes])
+        # Usar list comprehension para melhor performance
+        acertos = sum(linha.get(f"Q{int(q)}_OK", False) for q in questoes)
         total = len(questoes)
         perc = round(100 * acertos / total, 1) if total > 0 else 0
         resultados.append((disc, acertos, total, perc))
     return resultados
 
-def gerar_graficos(nome, posicao, percentual, df_boletim, media_df, ranking_df, pasta):
-    """Gera os gráficos para o boletim individual com tema verde ACAFE"""
+def gerar_graficos_otimizado(nome, posicao, percentual, df_boletim, media_df, ranking_df, pasta):
+    """Gera os gráficos para o boletim individual - VERSÃO OTIMIZADA"""
     try:
         labels = df_boletim["Disciplina"].tolist()
         aluno_vals = df_boletim["%"].values
@@ -336,11 +506,56 @@ def gerar_graficos(nome, posicao, percentual, df_boletim, media_df, ranking_df, 
         cor_secundaria = '#4a8c6a'
         cor_destaque = '#6bb77b'
         
-        # Configurar estilo dos gráficos
+        # Configurar estilo dos gráficos uma vez
         plt.style.use('default')
+        plt.rcParams.update({
+            'font.size': 10,
+            'axes.titlesize': 14,
+            'axes.labelsize': 12,
+            'xtick.labelsize': 10,
+            'ytick.labelsize': 10,
+            'legend.fontsize': 12
+        })
         
-        # Radar
+        graficos_paths = []
+        
+        # Gráfico de Barras (mais importante)
         if len(labels) > 0:
+            x = np.arange(len(labels))
+            bar_width = 0.35
+            fig, ax = plt.subplots(figsize=(14, 8))
+            
+            bars1 = ax.bar(x - bar_width/2, aluno_vals, bar_width, label=nome, 
+                          color=cor_principal, alpha=0.8, edgecolor='white', linewidth=1)
+            bars2 = ax.bar(x + bar_width/2, media_vals, bar_width, label="Média Turma", 
+                          color=cor_secundaria, alpha=0.7, edgecolor='white', linewidth=1)
+            
+            # Adicionar valores nas barras
+            for i, v in enumerate(aluno_vals):
+                ax.text(i - bar_width/2, v + 1.5, f"{v:.1f}%", ha="center", fontsize=10, 
+                       fontweight='bold', color=cor_principal)
+            for i, v in enumerate(media_vals):
+                ax.text(i + bar_width/2, v + 1.5, f"{v:.1f}%", ha="center", fontsize=10, 
+                       color=cor_secundaria)
+                
+            ax.set_xticks(x)
+            ax.set_xticklabels(labels, rotation=45, ha='right', fontsize=11)
+            ax.set_ylabel("Percentual de Acertos (%)", fontsize=12, fontweight='bold')
+            ax.set_title(f"Desempenho por Disciplina - {nome}", fontsize=16, fontweight='bold', 
+                        color=cor_principal, pad=20)
+            ax.legend(fontsize=12)
+            ax.grid(axis='y', alpha=0.3)
+            ax.set_ylim(0, 105)
+            
+            barras_path = os.path.join(pasta, f"{nome}_barras.png")
+            plt.savefig(barras_path, bbox_inches="tight", dpi=150, facecolor='white')
+            plt.close()
+            graficos_paths.append(barras_path)
+        else:
+            graficos_paths.append(None)
+
+        # Gráfico Radar (se houver disciplinas suficientes)
+        if len(labels) >= 3:
             angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
             aluno_circ = np.concatenate((aluno_vals, [aluno_vals[0]]))
             media_circ = np.concatenate((media_vals, [media_vals[0]]))
@@ -358,48 +573,13 @@ def gerar_graficos(nome, posicao, percentual, df_boletim, media_df, ranking_df, 
             ax.grid(True, alpha=0.3)
             plt.title(f"Desempenho Radar - {nome}", fontsize=14, fontweight='bold', color=cor_principal, pad=20)
             radar_path = os.path.join(pasta, f"{nome}_radar.png")
-            plt.savefig(radar_path, bbox_inches="tight", dpi=200, facecolor='white')
+            plt.savefig(radar_path, bbox_inches="tight", dpi=150, facecolor='white')
             plt.close()
+            graficos_paths.append(radar_path)
         else:
-            radar_path = None
+            graficos_paths.append(None)
 
-        # Barras
-        x = np.arange(len(labels))
-        bar_width = 0.35
-        fig, ax = plt.subplots(figsize=(14, 8))
-        
-        bars1 = ax.bar(x - bar_width/2, aluno_vals, bar_width, label=nome, 
-                      color=cor_principal, alpha=0.8, edgecolor='white', linewidth=1)
-        bars2 = ax.bar(x + bar_width/2, media_vals, bar_width, label="Média Turma", 
-                      color=cor_secundaria, alpha=0.7, edgecolor='white', linewidth=1)
-        
-        # Adicionar valores nas barras
-        for i, v in enumerate(aluno_vals):
-            ax.text(i - bar_width/2, v + 1.5, f"{v:.1f}%", ha="center", fontsize=10, 
-                   fontweight='bold', color=cor_principal)
-        for i, v in enumerate(media_vals):
-            ax.text(i + bar_width/2, v + 1.5, f"{v:.1f}%", ha="center", fontsize=10, 
-                   color=cor_secundaria)
-            
-        ax.set_xticks(x)
-        ax.set_xticklabels(labels, rotation=45, ha='right', fontsize=11)
-        ax.set_ylabel("Percentual de Acertos (%)", fontsize=12, fontweight='bold')
-        ax.set_title(f"Desempenho por Disciplina - {nome}", fontsize=16, fontweight='bold', 
-                    color=cor_principal, pad=20)
-        ax.legend(fontsize=12)
-        ax.grid(axis='y', alpha=0.3)
-        ax.set_ylim(0, 105)
-        
-        # Personalizar spines
-        for spine in ax.spines.values():
-            spine.set_color(cor_principal)
-            spine.set_linewidth(1.5)
-        
-        barras_path = os.path.join(pasta, f"{nome}_barras.png")
-        plt.savefig(barras_path, bbox_inches="tight", dpi=200, facecolor='white')
-        plt.close()
-
-        # Distribuição
+        # Distribuição das notas
         fig, ax = plt.subplots(figsize=(12, 7))
         n, bins, patches = ax.hist(ranking_df["Percentual"]*100, bins=min(12, len(ranking_df)), 
                                   color=cor_destaque, edgecolor=cor_principal, alpha=0.7, linewidth=1.5)
@@ -419,14 +599,10 @@ def gerar_graficos(nome, posicao, percentual, df_boletim, media_df, ranking_df, 
         ax.legend(fontsize=12)
         ax.grid(alpha=0.3)
         
-        # Personalizar spines
-        for spine in ax.spines.values():
-            spine.set_color(cor_principal)
-            spine.set_linewidth(1.5)
-        
         dist_path = os.path.join(pasta, f"{nome}_dist.png")
-        plt.savefig(dist_path, bbox_inches="tight", dpi=200, facecolor='white')
+        plt.savefig(dist_path, bbox_inches="tight", dpi=150, facecolor='white')
         plt.close()
+        graficos_paths.append(dist_path)
 
         # Ranking
         fig, ax = plt.subplots(figsize=(12, 7))
@@ -446,20 +622,16 @@ def gerar_graficos(nome, posicao, percentual, df_boletim, media_df, ranking_df, 
         ax.legend(fontsize=12)
         ax.grid(alpha=0.3)
         
-        # Personalizar spines
-        for spine in ax.spines.values():
-            spine.set_color(cor_principal)
-            spine.set_linewidth(1.5)
-        
         rank_path = os.path.join(pasta, f"{nome}_rank.png")
-        plt.savefig(rank_path, bbox_inches="tight", dpi=200, facecolor='white')
+        plt.savefig(rank_path, bbox_inches="tight", dpi=150, facecolor='white')
         plt.close()
+        graficos_paths.append(rank_path)
 
-        return barras_path, radar_path, dist_path, rank_path
+        return graficos_paths
     
     except Exception as e:
         st.error(f"Erro ao gerar gráficos para {nome}: {str(e)}")
-        return None, None, None, None
+        return [None, None, None, None]
 
 class BoletimPDF(FPDF):
     def __init__(self):
@@ -468,7 +640,7 @@ class BoletimPDF(FPDF):
         self.logo_fleming_path = logos.get('fleming')
     
     def header(self):
-        """Header melhorado com logos oficiais"""
+        """Header melhorado com logos oficiais - SEM WARNINGS"""
         # Fundo verde no header
         self.set_fill_color(45, 90, 61)  # Verde ACAFE
         self.rect(0, 0, 210, 45, 'F')
@@ -477,27 +649,27 @@ class BoletimPDF(FPDF):
         if self.logo_acafe_path and os.path.exists(self.logo_acafe_path):
             try:
                 self.image(self.logo_acafe_path, 15, 8, 30)
-            except Exception as e:
+            except Exception:
                 pass
         
         # Logo Fleming (direita)
         if self.logo_fleming_path and os.path.exists(self.logo_fleming_path):
             try:
                 self.image(self.logo_fleming_path, 165, 8, 30)
-            except Exception as e:
+            except Exception:
                 pass
         
         # Título central
-        self.set_font("Arial", "B", 20)
+        self.set_font("Helvetica", "B", 20)
         self.set_text_color(255, 255, 255)  # Branco
         self.set_y(15)
-        self.cell(0, 8, "SIMULADO ACAFE", ln=True, align="C")
+        self.cell(0, 8, "SIMULADO ACAFE", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
         
-        self.set_font("Arial", "B", 16)
-        self.cell(0, 8, "COLEGIO FLEMING", ln=True, align="C")
+        self.set_font("Helvetica", "B", 16)
+        self.cell(0, 8, "COLEGIO FLEMING", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
         
-        self.set_font("Arial", "", 12)
-        self.cell(0, 6, "Relatorio Individual de Desempenho", ln=True, align="C")
+        self.set_font("Helvetica", "", 12)
+        self.cell(0, 6, "Relatorio Individual de Desempenho", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
         
         # Linha decorativa
         self.set_draw_color(255, 255, 255)
@@ -508,7 +680,7 @@ class BoletimPDF(FPDF):
         self.ln(18)
 
     def add_aluno_info(self, nome, posicao, percentual, media_turma, aluno_data=None):
-        """Informações do aluno com design melhorado"""
+        """Informações do aluno com design melhorado - SEM WARNINGS"""
         # Caixa principal
         self.set_fill_color(240, 248, 245)  # Verde muito claro
         self.set_draw_color(45, 90, 61)  # Verde escuro
@@ -516,72 +688,71 @@ class BoletimPDF(FPDF):
         self.rect(10, self.get_y(), 190, 50, 'DF')
         
         # Título da seção
-        self.set_font("Arial", "B", 16)
+        self.set_font("Helvetica", "B", 16)
         self.set_text_color(45, 90, 61)
         self.set_y(self.get_y() + 8)
-        self.cell(0, 8, "INFORMACOES DO ESTUDANTE", ln=True, align="C")
+        self.cell(0, 8, "INFORMACOES DO ESTUDANTE", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
         
         # Informações em duas colunas
         y_start = self.get_y() + 3
         
         # Coluna esquerda
-        self.set_font("Arial", "B", 12)
+        self.set_font("Helvetica", "B", 12)
         self.set_text_color(0, 0, 0)
         self.set_y(y_start)
         self.set_x(15)
-        self.cell(90, 7, f"Nome: {nome}", ln=True)
+        self.cell(90, 7, f"Nome: {nome}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         
         self.set_x(15)
-        self.cell(90, 7, f"Posicao no Ranking: {posicao}º lugar", ln=True)
+        self.cell(90, 7, f"Posicao no Ranking: {posicao}º lugar", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         
         if aluno_data and 'Sede' in aluno_data:
             self.set_x(15)
-            self.cell(90, 7, f"Sede: {aluno_data['Sede']}", ln=True)
+            self.cell(90, 7, f"Sede: {aluno_data['Sede']}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         
         # Coluna direita
         self.set_y(y_start)
         self.set_x(110)
-        self.cell(90, 7, f"Nota Individual: {percentual:.1f}%", ln=True)
+        self.cell(90, 7, f"Nota Individual: {percentual:.1f}%", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         
         self.set_x(110)
-        self.cell(90, 7, f"Media da Turma: {media_turma:.1f}%", ln=True)
+        self.cell(90, 7, f"Media da Turma: {media_turma:.1f}%", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         
         # Diferença com cor
         diferenca = percentual - media_turma
         self.set_x(110)
         if diferenca > 0:
             self.set_text_color(0, 128, 0)  # Verde
-            self.cell(90, 7, f"Diferenca: +{diferenca:.1f}% (acima)", ln=True)
+            self.cell(90, 7, f"Diferenca: +{diferenca:.1f}% (acima)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         else:
             self.set_text_color(255, 0, 0)  # Vermelho
-            self.cell(90, 7, f"Diferenca: {diferenca:.1f}% (abaixo)", ln=True)
+            self.cell(90, 7, f"Diferenca: {diferenca:.1f}% (abaixo)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         
         self.set_text_color(0, 0, 0)  # Voltar para preto
         self.ln(18)
 
     def add_table(self, df):
-        """Tabela melhorada com cores alternadas"""
+        """Tabela melhorada com cores alternadas - SEM WARNINGS"""
         # Título da tabela
-        self.set_font("Arial", "B", 14)
+        self.set_font("Helvetica", "B", 14)
         self.set_text_color(45, 90, 61)
-        self.cell(0, 10, "DESEMPENHO POR DISCIPLINA", ln=True, align="C")
+        self.cell(0, 10, "DESEMPENHO POR DISCIPLINA", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
         self.ln(5)
         
         # Cabeçalho da tabela
         self.set_fill_color(45, 90, 61)  # Verde ACAFE
         self.set_text_color(255, 255, 255)  # Branco
-        self.set_font("Arial", "B", 10)
+        self.set_font("Helvetica", "B", 10)
         
-        self.cell(50, 10, "Disciplina", 1, 0, 'C', True)
-        self.cell(25, 10, "Acertos", 1, 0, 'C', True)
-        self.cell(25, 10, "Total", 1, 0, 'C', True)
-        self.cell(30, 10, "Nota (%)", 1, 0, 'C', True)
-        self.cell(30, 10, "Media (%)", 1, 0, 'C', True)
-        self.cell(30, 10, "Diferenca", 1, 0, 'C', True)
-        self.ln()
+        self.cell(50, 10, "Disciplina", 1, new_x=XPos.RIGHT, new_y=YPos.TOP, align='C', fill=True)
+        self.cell(25, 10, "Acertos", 1, new_x=XPos.RIGHT, new_y=YPos.TOP, align='C', fill=True)
+        self.cell(25, 10, "Total", 1, new_x=XPos.RIGHT, new_y=YPos.TOP, align='C', fill=True)
+        self.cell(30, 10, "Nota (%)", 1, new_x=XPos.RIGHT, new_y=YPos.TOP, align='C', fill=True)
+        self.cell(30, 10, "Media (%)", 1, new_x=XPos.RIGHT, new_y=YPos.TOP, align='C', fill=True)
+        self.cell(30, 10, "Diferenca", 1, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C', fill=True)
         
         # Dados da tabela
-        self.set_font("Arial", "", 9)
+        self.set_font("Helvetica", "", 9)
         
         for i, (_, row) in enumerate(df.iterrows()):
             # Alternar cores das linhas
@@ -592,28 +763,27 @@ class BoletimPDF(FPDF):
             
             self.set_text_color(0, 0, 0)
             disciplina = str(row["Disciplina"])[:22]  # Limitar tamanho
-            self.cell(50, 8, disciplina, 1, 0, 'L', True)
-            self.cell(25, 8, str(row["Acertos"]), 1, 0, 'C', True)
-            self.cell(25, 8, str(row["Total"]), 1, 0, 'C', True)
-            self.cell(30, 8, f"{row['%']:.1f}%", 1, 0, 'C', True)
-            self.cell(30, 8, f"{row['Media Turma']:.1f}%", 1, 0, 'C', True)
+            self.cell(50, 8, disciplina, 1, new_x=XPos.RIGHT, new_y=YPos.TOP, align='L', fill=True)
+            self.cell(25, 8, str(row["Acertos"]), 1, new_x=XPos.RIGHT, new_y=YPos.TOP, align='C', fill=True)
+            self.cell(25, 8, str(row["Total"]), 1, new_x=XPos.RIGHT, new_y=YPos.TOP, align='C', fill=True)
+            self.cell(30, 8, f"{row['%']:.1f}%", 1, new_x=XPos.RIGHT, new_y=YPos.TOP, align='C', fill=True)
+            self.cell(30, 8, f"{row['Media Turma']:.1f}%", 1, new_x=XPos.RIGHT, new_y=YPos.TOP, align='C', fill=True)
             
             diferenca = row['Diferenca']
             texto_dif = f"+{diferenca:.1f}%" if diferenca > 0 else f"{diferenca:.1f}%"
-            self.cell(30, 8, texto_dif, 1, 0, 'C', True)
-            self.ln()
+            self.cell(30, 8, texto_dif, 1, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C', fill=True)
         
         self.set_text_color(0, 0, 0)  # Voltar para preto
         self.ln(12)
 
     def add_image(self, path, largura=180, titulo=""):
-        """Adiciona imagem com título"""
+        """Adiciona imagem com título - SEM WARNINGS"""
         if path and os.path.exists(path):
             try:
                 if titulo:
-                    self.set_font("Arial", "B", 12)
+                    self.set_font("Helvetica", "B", 12)
                     self.set_text_color(45, 90, 61)
-                    self.cell(0, 10, titulo, ln=True, align="C")
+                    self.cell(0, 10, titulo, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
                     self.ln(3)
                 
                 x_pos = (210 - largura) / 2
@@ -621,13 +791,13 @@ class BoletimPDF(FPDF):
                 self.ln(12)
                 
             except Exception as e:
-                self.set_font("Arial", "", 10)
+                self.set_font("Helvetica", "", 10)
                 self.set_text_color(255, 0, 0)
-                self.cell(0, 10, f"Erro ao carregar grafico: {str(e)}", ln=True, align="C")
+                self.cell(0, 10, f"Erro ao carregar grafico: {str(e)}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
                 self.set_text_color(0, 0, 0)
 
     def footer(self):
-        """Footer melhorado"""
+        """Footer melhorado - SEM WARNINGS"""
         self.set_y(-25)
         
         # Linha decorativa
@@ -635,12 +805,12 @@ class BoletimPDF(FPDF):
         self.set_line_width(0.8)
         self.line(20, self.get_y(), 190, self.get_y())
         
-        self.set_font("Arial", "", 9)
+        self.set_font("Helvetica", "", 9)
         self.set_text_color(100, 100, 100)
         self.ln(5)
-        self.cell(0, 5, f"Pagina {self.page_no()}", 0, 0, 'C')
+        self.cell(0, 5, f"Pagina {self.page_no()}", new_x=XPos.RIGHT, new_y=YPos.TOP, align='C')
         self.ln(4)
-        self.cell(0, 5, "Sistema de Correcao ACAFE - Colegio Fleming | Logos Oficiais", 0, 0, 'C')
+        self.cell(0, 5, "Sistema de Correcao ACAFE - Colegio Fleming | v4.0", new_x=XPos.RIGHT, new_y=YPos.TOP, align='C')
 
 # --------------------------
 # APLICAR CSS E HEADER
@@ -661,16 +831,32 @@ with st.sidebar:
     else:
         st.warning("⚠️ Algumas logos não foram carregadas")
     
+    # BOTÃO PARA BAIXAR TEMPLATE
+    st.markdown("### 📋 **Template Excel**")
+    
+    template_excel = criar_template_excel()
+    st.download_button(
+        label="📥 **Baixar Template Excel**",
+        data=template_excel,
+        file_name="Template_Simulado_ACAFE_Fleming.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        help="Template pré-formatado com validação de dados e tema ACAFE",
+        use_container_width=True
+    )
+    
+    st.info("💡 **Use este template** para garantir que seu arquivo tenha a estrutura correta!")
+    
     with st.expander("📊 **Aba RESPOSTAS**", expanded=False):
         st.markdown("""
         - **ID**: Número único do aluno
         - **Nome**: Nome completo
-        - **Questão 01, Questão 02...**: Respostas (A, B, C, D, E)
+        - **Sede**: Unidade do colégio
+        - **Questão 01-70**: Respostas (A, B, C, D, E)
         """)
     
     with st.expander("📝 **Aba GABARITO**", expanded=False):
         st.markdown("""
-        - **Questão**: Número da questão
+        - **Questão**: Número da questão (1-70)
         - **Resposta**: Resposta correta (A-E)
         - **Disciplina**: Nome da matéria
         """)
@@ -760,7 +946,7 @@ else:
     arquivo = st.file_uploader(
         "📎 **Selecione o arquivo Excel**", 
         type=["xlsx"], 
-        help="Arquivo deve conter as abas 'RESPOSTAS' e 'GABARITO'",
+        help="Arquivo deve conter as abas 'RESPOSTAS' e 'GABARITO'. Use o template acima para garantir compatibilidade!",
         key="file_uploader"
     )
 
@@ -773,8 +959,8 @@ else:
             status_text.success("📖 Lendo arquivo Excel...")
             progress_bar.progress(10)
             
-            # Ler arquivo Excel
-            dados = pd.read_excel(arquivo, sheet_name=None)
+            # Ler arquivo Excel com engine otimizado
+            dados = pd.read_excel(arquivo, sheet_name=None, engine='openpyxl')
             
             status_text.success("✅ Validando estrutura do arquivo...")
             progress_bar.progress(20)
@@ -847,26 +1033,20 @@ else:
                 questoes = gabarito[gabarito['Disciplina'] == disciplina]['Questão'].tolist()
                 mapa_disciplinas[disciplina] = questoes
 
-            respostas_corr = corrigir_respostas(respostas, gabarito, mapa_disciplinas)
+            # Usar função otimizada
+            respostas_corr = corrigir_respostas_otimizado(respostas, gabarito, mapa_disciplinas)
             
             status_text.success("📈 Calculando ranking...")
             progress_bar.progress(50)
 
-            # Ranking
-            percentuais = []
+            # Ranking otimizado
             questoes_unicas = gabarito['Questão'].unique()
             
-            for i, row in respostas_corr.iterrows():
-                acertos_tot = 0
-                for questao in questoes_unicas:
-                    col_ok = f"Q{int(questao)}_OK"
-                    if col_ok in row and row[col_ok]:
-                        acertos_tot += 1
-                
-                percentual = acertos_tot / len(questoes_unicas) if len(questoes_unicas) > 0 else 0
-                percentuais.append(percentual)
+            # Calcular percentuais de forma vetorizada
+            colunas_ok = [f"Q{int(q)}_OK" for q in questoes_unicas]
+            colunas_ok_existentes = [col for col in colunas_ok if col in respostas_corr.columns]
             
-            respostas_corr["Percentual"] = percentuais
+            respostas_corr["Percentual"] = respostas_corr[colunas_ok_existentes].sum(axis=1) / len(questoes_unicas)
 
             ranking_df = respostas_corr[["ID", "Nome", "Percentual"]].sort_values("Percentual", ascending=False).reset_index(drop=True)
             ranking_df["Posição"] = ranking_df.index + 1
@@ -893,14 +1073,14 @@ else:
             status_text.success("📊 Calculando médias por disciplina...")
             progress_bar.progress(60)
 
-            # Médias por disciplina
+            # Médias por disciplina otimizadas
             media_disciplinas = []
             for disc, questoes in mapa_disciplinas.items():
-                acertos = []
-                for _, row in respostas_corr.iterrows():
-                    acertos_disc = sum([row.get(f"Q{int(q)}_OK", False) for q in questoes])
-                    acertos.append(acertos_disc / len(questoes) if len(questoes) > 0 else 0)
-                media_disciplinas.append((disc, round(np.mean(acertos)*100, 1)))
+                colunas_disc = [f"Q{int(q)}_OK" for q in questoes if f"Q{int(q)}_OK" in respostas_corr.columns]
+                if colunas_disc:
+                    media_disc = respostas_corr[colunas_disc].mean().mean() * 100
+                    media_disciplinas.append((disc, round(media_disc, 1)))
+            
             media_df = pd.DataFrame(media_disciplinas, columns=["Disciplina", "%"])
             
             status_text.success("📄 Gerando boletins individuais...")
@@ -923,15 +1103,15 @@ else:
                         posicao = int(ranking_df.loc[ranking_df["ID"] == aluno["ID"], "Posição"].iloc[0])
                         percentual = aluno["Percentual"] * 100
 
-                        resultados = resultados_disciplina(aluno, mapa_disciplinas)
+                        resultados = resultados_disciplina_otimizado(aluno, mapa_disciplinas)
                         df_boletim = pd.DataFrame(resultados, columns=["Disciplina", "Acertos", "Total", "%"])
                         df_boletim["Media Turma"] = media_df["%"]
                         df_boletim["Diferenca"] = (df_boletim["%"] - media_df["%"]).round(1)
 
-                        # Gráficos
-                        barras, radar, dist, rank = gerar_graficos(nome, posicao, percentual, df_boletim, media_df, ranking_df, tmpdir)
+                        # Gráficos otimizados
+                        graficos = gerar_graficos_otimizado(nome, posicao, percentual, df_boletim, media_df, ranking_df, tmpdir)
 
-                        # PDF COM LOGOS OFICIAIS
+                        # PDF COM LOGOS OFICIAIS E SEM WARNINGS
                         try:
                             pdf = BoletimPDF()
                             pdf.add_page()
@@ -944,14 +1124,16 @@ else:
                             pdf.add_table(df_boletim)
                             
                             # Gráficos
-                            if barras:
-                                pdf.add_image(barras, titulo="DESEMPENHO POR DISCIPLINA")
-                            if radar:
-                                pdf.add_image(radar, titulo="GRAFICO RADAR - COMPARACAO COM A TURMA")
-                            if dist:
-                                pdf.add_image(dist, titulo="DISTRIBUICAO DAS NOTAS DA TURMA")
-                            if rank:
-                                pdf.add_image(rank, titulo="POSICAO NO RANKING GERAL")
+                            titulos = [
+                                "DESEMPENHO POR DISCIPLINA",
+                                "GRAFICO RADAR - COMPARACAO COM A TURMA", 
+                                "DISTRIBUICAO DAS NOTAS DA TURMA",
+                                "POSICAO NO RANKING GERAL"
+                            ]
+                            
+                            for grafico, titulo in zip(graficos, titulos):
+                                if grafico:
+                                    pdf.add_image(grafico, titulo=titulo)
 
                             pdf_path = os.path.join(tmpdir, f"Boletim_{nome}.pdf")
                             pdf.output(pdf_path)
@@ -997,7 +1179,6 @@ st.markdown("""
 <div class="footer">
     <p><strong>Corretor ACAFE - Colégio Fleming</strong></p>
     <p>Desenvolvido com ❤️ para facilitar a correção de simulados</p>
-    <p style="font-size: 0.8rem; opacity: 0.7;">Versão 4.0 - LOGOS OFICIAIS | Interface e PDFs com identidade visual completa</p>
+    <p style="font-size: 0.8rem; opacity: 0.7;">Versão 4.0 FINAL - Template Excel | Performance Otimizada | Logos Oficiais | Sem Warnings</p>
 </div>
 """, unsafe_allow_html=True)
-
