@@ -13,9 +13,7 @@ from PIL import Image
 import requests
 from io import BytesIO
 import openpyxl
-from openpyxl.styles import PatternFill, Font, Alignment, Protection
-from openpyxl.worksheet.protection import SheetProtection
-from openpyxl.data_validation import DataValidation
+from openpyxl.styles import PatternFill, Font, Alignment
 
 # Configurar matplotlib para usar backend não-interativo
 import matplotlib
@@ -82,12 +80,12 @@ if not st.session_state.logos_carregadas:
 logos = st.session_state.logos
 
 # --------------------------
-# FUNÇÃO PARA CRIAR TEMPLATE EXCEL
+# FUNÇÃO PARA CRIAR TEMPLATE EXCEL - VERSÃO SIMPLIFICADA
 # --------------------------
 
 @st.cache_data
 def criar_template_excel():
-    """Cria template Excel com formatação ACAFE"""
+    """Cria template Excel com formatação ACAFE - VERSÃO COMPATÍVEL COM RENDER"""
     
     # Criar workbook
     wb = openpyxl.Workbook()
@@ -123,16 +121,6 @@ def criar_template_excel():
             cell = ws_respostas.cell(row=row_idx, column=col_idx, value=valor)
             if row_idx % 2 == 0:
                 cell.fill = PatternFill(start_color=cor_verde_claro, end_color=cor_verde_claro, fill_type="solid")
-    
-    # Validação de dados para respostas (A, B, C, D, E)
-    dv = DataValidation(type="list", formula1='"A,B,C,D,E"', allow_blank=True)
-    dv.error = "Por favor, insira apenas A, B, C, D ou E"
-    dv.errorTitle = "Entrada Inválida"
-    ws_respostas.add_data_validation(dv)
-    
-    # Aplicar validação nas colunas de questões
-    for col in range(4, 74):  # Colunas D até BU (questões 01-70)
-        dv.add(f"{openpyxl.utils.get_column_letter(col)}2:{openpyxl.utils.get_column_letter(col)}1000")
     
     # Ajustar largura das colunas
     ws_respostas.column_dimensions['A'].width = 8   # ID
@@ -176,13 +164,6 @@ def criar_template_excel():
             if row_idx % 2 == 0:
                 cell.fill = PatternFill(start_color=cor_verde_claro, end_color=cor_verde_claro, fill_type="solid")
     
-    # Validação para respostas do gabarito
-    dv_gabarito = DataValidation(type="list", formula1='"A,B,C,D,E"', allow_blank=False)
-    dv_gabarito.error = "Por favor, insira apenas A, B, C, D ou E"
-    dv_gabarito.errorTitle = "Entrada Inválida"
-    ws_gabarito.add_data_validation(dv_gabarito)
-    dv_gabarito.add("B2:B1000")
-    
     # Ajustar largura das colunas
     ws_gabarito.column_dimensions['A'].width = 12  # Questão
     ws_gabarito.column_dimensions['B'].width = 12  # Resposta
@@ -213,10 +194,10 @@ def criar_template_excel():
         ["   • O sistema permite questões com mesmo número", ""],
         ["   • para disciplinas diferentes", ""],
         ["", ""],
-        ["4. VALIDAÇÃO:", ""],
-        ["   • Células têm validação automática", ""],
-        ["   • Só aceita respostas válidas (A-E)", ""],
-        ["   • Formatação tema ACAFE aplicada", ""],
+        ["4. IMPORTANTE:", ""],
+        ["   • Mantenha a estrutura das abas", ""],
+        ["   • Não altere os cabeçalhos", ""],
+        ["   • Use apenas respostas válidas (A-E)", ""],
         ["", ""],
         ["DESENVOLVIDO PARA COLÉGIO FLEMING", ""],
         ["Sistema de Correção ACAFE v4.0", ""]
@@ -232,10 +213,6 @@ def criar_template_excel():
             cell.font = Font(color="333333")
     
     ws_instrucoes.column_dimensions['A'].width = 50
-    
-    # Proteger planilha (opcional - desabilitado para facilitar edição)
-    # ws_respostas.protection = SheetProtection(password="acafe2024")
-    # ws_gabarito.protection = SheetProtection(password="acafe2024")
     
     # Salvar em bytes
     from io import BytesIO
@@ -834,17 +811,21 @@ with st.sidebar:
     # BOTÃO PARA BAIXAR TEMPLATE
     st.markdown("### 📋 **Template Excel**")
     
-    template_excel = criar_template_excel()
-    st.download_button(
-        label="📥 **Baixar Template Excel**",
-        data=template_excel,
-        file_name="Template_Simulado_ACAFE_Fleming.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        help="Template pré-formatado com validação de dados e tema ACAFE",
-        use_container_width=True
-    )
-    
-    st.info("💡 **Use este template** para garantir que seu arquivo tenha a estrutura correta!")
+    try:
+        template_excel = criar_template_excel()
+        st.download_button(
+            label="📥 **Baixar Template Excel**",
+            data=template_excel,
+            file_name="Template_Simulado_ACAFE_Fleming.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            help="Template pré-formatado com tema ACAFE e estrutura correta",
+            use_container_width=True
+        )
+        
+        st.info("💡 **Use este template** para garantir que seu arquivo tenha a estrutura correta!")
+    except Exception as e:
+        st.error(f"⚠️ Erro ao gerar template: {str(e)}")
+        st.info("📝 **Estrutura manual:** Crie abas 'RESPOSTAS' e 'GABARITO' com as colunas indicadas abaixo.")
     
     with st.expander("📊 **Aba RESPOSTAS**", expanded=False):
         st.markdown("""
@@ -1179,6 +1160,6 @@ st.markdown("""
 <div class="footer">
     <p><strong>Corretor ACAFE - Colégio Fleming</strong></p>
     <p>Desenvolvido com ❤️ para facilitar a correção de simulados</p>
-    <p style="font-size: 0.8rem; opacity: 0.7;">Versão 4.0 FINAL - Template Excel | Performance Otimizada | Logos Oficiais | Sem Warnings</p>
+    <p style="font-size: 0.8rem; opacity: 0.7;">Versão 4.0 RENDER - Template Excel | Performance Otimizada | Logos Oficiais | Compatível</p>
 </div>
 """, unsafe_allow_html=True)
