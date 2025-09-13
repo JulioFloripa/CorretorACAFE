@@ -9,6 +9,9 @@ import zipfile
 import os
 import traceback
 import base64
+from PIL import Image
+import requests
+from io import BytesIO
 
 # Configurar matplotlib para usar backend não-interativo
 import matplotlib
@@ -442,58 +445,173 @@ def gerar_graficos(nome, posicao, percentual, df_boletim, media_df, ranking_df, 
         return None, None, None, None
 
 class BoletimPDF(FPDF):
+    def __init__(self):
+        super().__init__()
+        self.logo_acafe_path = None
+        self.logo_fleming_path = None
+        self.setup_logos()
+    
+    def setup_logos(self):
+        """Configura as logos para uso no PDF"""
+        try:
+            # Salvar logos das imagens encontradas
+            self.logo_acafe_path = "/home/ubuntu/upload/search_images/kPLqwT1pnljr.jpeg"
+            self.logo_fleming_path = "/home/ubuntu/upload/search_images/9uRs8wwV5n9x.jpg"
+        except Exception as e:
+            st.warning(f"Aviso: Não foi possível carregar as logos: {e}")
+    
     def header(self):
-        # CORRIGIDO: Removido emoji que causava erro
-        self.set_font("Arial", "B", 16)
-        self.set_text_color(45, 90, 61)  # Verde ACAFE
-        self.cell(0, 15, "SIMULADO ACAFE - COLEGIO FLEMING", ln=True, align="C")
-        self.set_text_color(0, 0, 0)  # Voltar para preto
-        self.ln(5)
-
-    def add_aluno_info(self, nome, posicao, percentual, media_turma):
-        # Caixa de informações do aluno
-        self.set_fill_color(232, 245, 243)  # Verde claro
-        self.set_draw_color(45, 90, 61)  # Verde escuro
-        self.rect(10, self.get_y(), 190, 35, 'DF')
+        """Header melhorado com logos e design profissional"""
+        # Fundo verde no header
+        self.set_fill_color(45, 90, 61)  # Verde ACAFE
+        self.rect(0, 0, 210, 40, 'F')
+        
+        # Logo ACAFE (esquerda)
+        if self.logo_acafe_path and os.path.exists(self.logo_acafe_path):
+            try:
+                self.image(self.logo_acafe_path, 15, 8, 25)
+            except:
+                pass
+        
+        # Logo Fleming (direita)
+        if self.logo_fleming_path and os.path.exists(self.logo_fleming_path):
+            try:
+                self.image(self.logo_fleming_path, 170, 8, 25)
+            except:
+                pass
+        
+        # Título central
+        self.set_font("Arial", "B", 18)
+        self.set_text_color(255, 255, 255)  # Branco
+        self.set_y(12)
+        self.cell(0, 8, "SIMULADO ACAFE", ln=True, align="C")
         
         self.set_font("Arial", "B", 14)
-        self.set_text_color(45, 90, 61)
-        self.cell(0, 10, f"Aluno: {nome}", ln=True)
+        self.cell(0, 8, "COLEGIO FLEMING", ln=True, align="C")
         
-        self.set_font("Arial", "", 12)
-        self.set_text_color(0, 0, 0)
-        self.cell(95, 8, f"Posicao no Ranking: {posicao} lugar", 0, 0)
-        self.cell(95, 8, f"Nota Individual: {percentual:.1f}%", ln=True)
+        self.set_font("Arial", "", 10)
+        self.cell(0, 6, "Relatorio Individual de Desempenho", ln=True, align="C")
         
-        self.cell(95, 8, f"Media da Turma: {media_turma:.1f}%", 0, 0)
-        diferenca = percentual - media_turma
-        if diferenca > 0:
-            self.set_text_color(0, 128, 0)  # Verde para positivo
-            self.cell(95, 8, f"Diferenca: +{diferenca:.1f}% (acima da media)", ln=True)
-        else:
-            self.set_text_color(255, 0, 0)  # Vermelho para negativo
-            self.cell(95, 8, f"Diferenca: {diferenca:.1f}% (abaixo da media)", ln=True)
+        # Linha decorativa
+        self.set_draw_color(255, 255, 255)
+        self.set_line_width(0.5)
+        self.line(20, 38, 190, 38)
         
         self.set_text_color(0, 0, 0)  # Voltar para preto
-        self.ln(10)
+        self.ln(15)
+
+    def add_aluno_info(self, nome, posicao, percentual, media_turma, aluno_data=None):
+        """Informações do aluno com design melhorado"""
+        # Caixa principal com gradiente simulado
+        self.set_fill_color(240, 248, 245)  # Verde muito claro
+        self.set_draw_color(45, 90, 61)  # Verde escuro
+        self.set_line_width(1)
+        self.rect(10, self.get_y(), 190, 45, 'DF')
+        
+        # Título da seção
+        self.set_font("Arial", "B", 14)
+        self.set_text_color(45, 90, 61)
+        self.set_y(self.get_y() + 5)
+        self.cell(0, 8, "INFORMACOES DO ESTUDANTE", ln=True, align="C")
+        
+        # Informações em duas colunas
+        y_start = self.get_y()
+        
+        # Coluna esquerda
+        self.set_font("Arial", "B", 11)
+        self.set_text_color(0, 0, 0)
+        self.set_y(y_start)
+        self.set_x(15)
+        self.cell(90, 6, f"Nome: {nome}", ln=True)
+        
+        self.set_x(15)
+        self.cell(90, 6, f"Posicao no Ranking: {posicao}º lugar", ln=True)
+        
+        if aluno_data and 'Sede' in aluno_data:
+            self.set_x(15)
+            self.cell(90, 6, f"Sede: {aluno_data['Sede']}", ln=True)
+        
+        # Coluna direita
+        self.set_y(y_start)
+        self.set_x(110)
+        self.cell(90, 6, f"Nota Individual: {percentual:.1f}%", ln=True)
+        
+        self.set_x(110)
+        self.cell(90, 6, f"Media da Turma: {media_turma:.1f}%", ln=True)
+        
+        # Diferença com cor
+        diferenca = percentual - media_turma
+        self.set_x(110)
+        if diferenca > 0:
+            self.set_text_color(0, 128, 0)  # Verde
+            self.cell(90, 6, f"Diferenca: +{diferenca:.1f}% (acima)", ln=True)
+        else:
+            self.set_text_color(255, 0, 0)  # Vermelho
+            self.cell(90, 6, f"Diferenca: {diferenca:.1f}% (abaixo)", ln=True)
+        
+        self.set_text_color(0, 0, 0)  # Voltar para preto
+        self.ln(15)
+
+    def add_performance_summary(self, percentual, posicao, total_alunos):
+        """Adiciona resumo de performance com indicadores visuais"""
+        # Caixa de performance
+        self.set_fill_color(248, 255, 254)  # Verde muito claro
+        self.set_draw_color(74, 140, 106)  # Verde médio
+        self.rect(10, self.get_y(), 190, 25, 'DF')
+        
+        self.set_font("Arial", "B", 12)
+        self.set_text_color(45, 90, 61)
+        self.set_y(self.get_y() + 3)
+        self.cell(0, 6, "RESUMO DE PERFORMANCE", ln=True, align="C")
+        
+        # Indicadores
+        y_pos = self.get_y()
+        
+        # Performance geral
+        if percentual >= 80:
+            status = "EXCELENTE"
+            cor = (0, 128, 0)
+        elif percentual >= 70:
+            status = "BOM"
+            cor = (255, 165, 0)
+        elif percentual >= 60:
+            status = "REGULAR"
+            cor = (255, 140, 0)
+        else:
+            status = "PRECISA MELHORAR"
+            cor = (255, 0, 0)
+        
+        self.set_font("Arial", "B", 10)
+        self.set_text_color(*cor)
+        self.set_y(y_pos)
+        self.cell(0, 8, f"STATUS: {status} | POSICAO: {posicao}/{total_alunos}", ln=True, align="C")
+        
+        self.set_text_color(0, 0, 0)
+        self.ln(8)
 
     def add_table(self, df):
+        """Tabela melhorada com cores alternadas e design profissional"""
+        # Título da tabela
+        self.set_font("Arial", "B", 12)
+        self.set_text_color(45, 90, 61)
+        self.cell(0, 8, "DESEMPENHO POR DISCIPLINA", ln=True, align="C")
+        self.ln(3)
+        
         # Cabeçalho da tabela
         self.set_fill_color(45, 90, 61)  # Verde ACAFE
         self.set_text_color(255, 255, 255)  # Branco
-        self.set_font("Arial", "B", 10)
+        self.set_font("Arial", "B", 9)
         
-        self.cell(40, 10, "Disciplina", 1, 0, 'C', True)
-        self.cell(25, 10, "Acertos", 1, 0, 'C', True)
-        self.cell(25, 10, "Total", 1, 0, 'C', True)
-        self.cell(25, 10, "Nota (%)", 1, 0, 'C', True)
-        self.cell(30, 10, "Media (%)", 1, 0, 'C', True)
-        self.cell(30, 10, "Diferenca", 1, 0, 'C', True)
+        # Larguras das colunas
+        col_widths = [45, 20, 20, 25, 25, 25, 30]
+        headers = ["Disciplina", "Acertos", "Total", "Nota (%)", "Media (%)", "Diferenca", "Status"]
+        
+        for i, header in enumerate(headers):
+            self.cell(col_widths[i], 8, header, 1, 0, 'C', True)
         self.ln()
         
         # Dados da tabela
-        self.set_text_color(0, 0, 0)  # Preto
-        self.set_font("Arial", "", 9)
+        self.set_font("Arial", "", 8)
         
         for i, (_, row) in enumerate(df.iterrows()):
             # Alternar cores das linhas
@@ -502,27 +620,100 @@ class BoletimPDF(FPDF):
             else:
                 self.set_fill_color(255, 255, 255)  # Branco
             
-            self.cell(40, 8, str(row["Disciplina"])[:18], 1, 0, 'L', True)
-            self.cell(25, 8, str(row["Acertos"]), 1, 0, 'C', True)
-            self.cell(25, 8, str(row["Total"]), 1, 0, 'C', True)
-            self.cell(25, 8, f"{row['%']:.1f}%", 1, 0, 'C', True)
-            self.cell(30, 8, f"{row['Media Turma']:.1f}%", 1, 0, 'C', True)
+            # Disciplina
+            self.set_text_color(0, 0, 0)
+            disciplina = str(row["Disciplina"])[:20]  # Limitar tamanho
+            self.cell(col_widths[0], 7, disciplina, 1, 0, 'L', True)
             
+            # Acertos e Total
+            self.cell(col_widths[1], 7, str(row["Acertos"]), 1, 0, 'C', True)
+            self.cell(col_widths[2], 7, str(row["Total"]), 1, 0, 'C', True)
+            
+            # Nota com cor baseada na performance
+            nota = row['%']
+            if nota >= 80:
+                self.set_text_color(0, 128, 0)  # Verde
+            elif nota >= 60:
+                self.set_text_color(255, 140, 0)  # Laranja
+            else:
+                self.set_text_color(255, 0, 0)  # Vermelho
+            
+            self.cell(col_widths[3], 7, f"{nota:.1f}%", 1, 0, 'C', True)
+            
+            # Média da turma
+            self.set_text_color(0, 0, 0)
+            self.cell(col_widths[4], 7, f"{row['Media Turma']:.1f}%", 1, 0, 'C', True)
+            
+            # Diferença com cor
             diferenca = row['Diferenca']
-            cor_diferenca = "+" if diferenca > 0 else ""
-            self.cell(30, 8, f"{cor_diferenca}{diferenca:.1f}%", 1, 0, 'C', True)
+            if diferenca > 0:
+                self.set_text_color(0, 128, 0)  # Verde
+                texto_dif = f"+{diferenca:.1f}%"
+            else:
+                self.set_text_color(255, 0, 0)  # Vermelho
+                texto_dif = f"{diferenca:.1f}%"
+            
+            self.cell(col_widths[5], 7, texto_dif, 1, 0, 'C', True)
+            
+            # Status
+            if nota >= 80:
+                status = "Otimo"
+                self.set_text_color(0, 128, 0)
+            elif nota >= 60:
+                status = "Bom"
+                self.set_text_color(255, 140, 0)
+            else:
+                status = "Melhorar"
+                self.set_text_color(255, 0, 0)
+            
+            self.cell(col_widths[6], 7, status, 1, 0, 'C', True)
             self.ln()
         
-        self.ln(8)
+        self.set_text_color(0, 0, 0)  # Voltar para preto
+        self.ln(10)
 
-    def add_image(self, path, largura=170):
+    def add_image(self, path, largura=180, titulo=""):
+        """Adiciona imagem com título e moldura"""
         if path and os.path.exists(path):
             try:
-                self.image(path, x=(210-largura)/2, w=largura)
-                self.ln(8)
+                if titulo:
+                    self.set_font("Arial", "B", 11)
+                    self.set_text_color(45, 90, 61)
+                    self.cell(0, 8, titulo, ln=True, align="C")
+                    self.ln(2)
+                
+                # Moldura para a imagem
+                x_pos = (210 - largura) / 2
+                y_pos = self.get_y()
+                
+                self.set_draw_color(45, 90, 61)
+                self.set_line_width(0.5)
+                
+                # Imagem
+                self.image(path, x=x_pos, w=largura)
+                self.ln(10)
+                
             except Exception as e:
                 self.set_font("Arial", "", 10)
-                self.cell(0, 10, f"Erro ao carregar imagem: {str(e)}", ln=True)
+                self.set_text_color(255, 0, 0)
+                self.cell(0, 10, f"Erro ao carregar grafico: {str(e)}", ln=True, align="C")
+                self.set_text_color(0, 0, 0)
+
+    def footer(self):
+        """Footer melhorado"""
+        self.set_y(-20)
+        
+        # Linha decorativa
+        self.set_draw_color(45, 90, 61)
+        self.set_line_width(0.5)
+        self.line(20, self.get_y(), 190, self.get_y())
+        
+        self.set_font("Arial", "", 8)
+        self.set_text_color(100, 100, 100)
+        self.ln(3)
+        self.cell(0, 5, f"Pagina {self.page_no()}", 0, 0, 'C')
+        self.ln(3)
+        self.cell(0, 5, "Sistema de Correcao ACAFE - Colegio Fleming", 0, 0, 'C')
 
 # --------------------------
 # SIDEBAR CUSTOMIZADA
@@ -813,21 +1004,30 @@ if arquivo:
                     # Gráficos
                     barras, radar, dist, rank = gerar_graficos(nome, posicao, percentual, df_boletim, media_df, ranking_df, tmpdir)
 
-                    # PDF
+                    # PDF MELHORADO
                     try:
                         pdf = BoletimPDF()
                         pdf.add_page()
-                        pdf.add_aluno_info(aluno["Nome"], posicao, percentual, media_turma)
+                        
+                        # Informações do aluno com dados extras
+                        aluno_data = {'Sede': aluno.get('Sede', 'N/A')}
+                        pdf.add_aluno_info(aluno["Nome"], posicao, percentual, media_turma, aluno_data)
+                        
+                        # Resumo de performance
+                        pdf.add_performance_summary(percentual, posicao, total_alunos)
+                        
+                        # Tabela melhorada
                         pdf.add_table(df_boletim)
                         
+                        # Gráficos com títulos
                         if barras:
-                            pdf.add_image(barras)
+                            pdf.add_image(barras, titulo="DESEMPENHO POR DISCIPLINA")
                         if radar:
-                            pdf.add_image(radar)
+                            pdf.add_image(radar, titulo="GRAFICO RADAR - COMPARACAO COM A TURMA")
                         if dist:
-                            pdf.add_image(dist)
+                            pdf.add_image(dist, titulo="DISTRIBUICAO DAS NOTAS DA TURMA")
                         if rank:
-                            pdf.add_image(rank)
+                            pdf.add_image(rank, titulo="POSICAO NO RANKING GERAL")
 
                         pdf_path = os.path.join(tmpdir, f"Boletim_{nome}.pdf")
                         pdf.output(pdf_path)
@@ -866,7 +1066,7 @@ st.markdown("""
 <div class="footer">
     <p><strong>Corretor ACAFE - Colégio Fleming</strong></p>
     <p>Desenvolvido com ❤️ para facilitar a correção de simulados</p>
-    <p style="font-size: 0.8rem; opacity: 0.7;">Versão 2.2 - PROBLEMA RESOLVIDO! | Cálculos Funcionais</p>
+    <p style="font-size: 0.8rem; opacity: 0.7;">Versão 3.0 - PDF PROFISSIONAL | Logos e Layout Melhorado</p>
 </div>
 """, unsafe_allow_html=True)
 
