@@ -168,7 +168,7 @@ def show_header():
                 {create_acafe_logo()}
             </div>
             <div>
-                <h1 class="header-title">🎓 Corretor ACAFE Fleming</h1>
+                <h1 class="header-title">Corretor ACAFE Fleming</h1>
                 <p class="header-subtitle">Sistema Inteligente de Correção de Simulados</p>
             </div>
         </div>
@@ -271,22 +271,21 @@ def validar_dados_gabarito(gabarito):
 # --------------------------
 
 def corrigir_respostas(df_respostas, gabarito, mapa_disciplinas):
-    """Corrige as respostas dos alunos baseado no gabarito"""
+    """Corrige as respostas dos alunos baseado no gabarito - CORRIGIDO"""
     respostas = df_respostas.copy()
     
-    for disc, questoes in mapa_disciplinas.items():
-        for q in questoes:
-            col = f"Q{int(q)}"
-            if col in respostas.columns:
-                try:
-                    # Para questões de línguas, pegar a primeira resposta encontrada
-                    resp_correta = gabarito.loc[gabarito["Questão"] == q, "Resposta"].values[0]
-                    respostas[f"{col}_OK"] = respostas[col] == resp_correta
-                except IndexError:
-                    st.warning(f"⚠️ Questão {q} não encontrada no gabarito")
-                    respostas[f"{col}_OK"] = False
-            else:
-                respostas[f"{col}_OK"] = False
+    # Para cada questão no gabarito, verificar se há resposta do aluno
+    for _, row_gabarito in gabarito.iterrows():
+        questao = row_gabarito["Questão"]
+        resposta_correta = row_gabarito["Resposta"]
+        col = f"Q{int(questao)}"
+        
+        if col in respostas.columns:
+            # Comparar resposta do aluno com gabarito
+            respostas[f"{col}_OK"] = respostas[col] == resposta_correta
+        else:
+            # Se não há coluna para essa questão, marcar como errado
+            respostas[f"{col}_OK"] = False
     
     return respostas
 
@@ -439,9 +438,10 @@ def gerar_graficos(nome, posicao, percentual, df_boletim, media_df, ranking_df, 
 
 class BoletimPDF(FPDF):
     def header(self):
+        # CORRIGIDO: Removido emoji que causava erro
         self.set_font("Arial", "B", 16)
         self.set_text_color(45, 90, 61)  # Verde ACAFE
-        self.cell(0, 15, "🎓 SIMULADO ACAFE - COLÉGIO FLEMING", ln=True, align="C")
+        self.cell(0, 15, "SIMULADO ACAFE - COLEGIO FLEMING", ln=True, align="C")
         self.set_text_color(0, 0, 0)  # Voltar para preto
         self.ln(5)
 
@@ -457,17 +457,17 @@ class BoletimPDF(FPDF):
         
         self.set_font("Arial", "", 12)
         self.set_text_color(0, 0, 0)
-        self.cell(95, 8, f"Posição no Ranking: {posicao}º lugar", 0, 0)
+        self.cell(95, 8, f"Posicao no Ranking: {posicao} lugar", 0, 0)
         self.cell(95, 8, f"Nota Individual: {percentual:.1f}%", ln=True)
         
-        self.cell(95, 8, f"Média da Turma: {media_turma:.1f}%", 0, 0)
+        self.cell(95, 8, f"Media da Turma: {media_turma:.1f}%", 0, 0)
         diferenca = percentual - media_turma
         if diferenca > 0:
             self.set_text_color(0, 128, 0)  # Verde para positivo
-            self.cell(95, 8, f"Diferença: +{diferenca:.1f}% (acima da média)", ln=True)
+            self.cell(95, 8, f"Diferenca: +{diferenca:.1f}% (acima da media)", ln=True)
         else:
             self.set_text_color(255, 0, 0)  # Vermelho para negativo
-            self.cell(95, 8, f"Diferença: {diferenca:.1f}% (abaixo da média)", ln=True)
+            self.cell(95, 8, f"Diferenca: {diferenca:.1f}% (abaixo da media)", ln=True)
         
         self.set_text_color(0, 0, 0)  # Voltar para preto
         self.ln(10)
@@ -482,8 +482,8 @@ class BoletimPDF(FPDF):
         self.cell(25, 10, "Acertos", 1, 0, 'C', True)
         self.cell(25, 10, "Total", 1, 0, 'C', True)
         self.cell(25, 10, "Nota (%)", 1, 0, 'C', True)
-        self.cell(30, 10, "Média (%)", 1, 0, 'C', True)
-        self.cell(30, 10, "Diferença", 1, 0, 'C', True)
+        self.cell(30, 10, "Media (%)", 1, 0, 'C', True)
+        self.cell(30, 10, "Diferenca", 1, 0, 'C', True)
         self.ln()
         
         # Dados da tabela
@@ -501,9 +501,9 @@ class BoletimPDF(FPDF):
             self.cell(25, 8, str(row["Acertos"]), 1, 0, 'C', True)
             self.cell(25, 8, str(row["Total"]), 1, 0, 'C', True)
             self.cell(25, 8, f"{row['%']:.1f}%", 1, 0, 'C', True)
-            self.cell(30, 8, f"{row['Média Turma']:.1f}%", 1, 0, 'C', True)
+            self.cell(30, 8, f"{row['Media Turma']:.1f}%", 1, 0, 'C', True)
             
-            diferenca = row['Diferença']
+            diferenca = row['Diferenca']
             cor_diferenca = "+" if diferenca > 0 else ""
             self.cell(30, 8, f"{cor_diferenca}{diferenca:.1f}%", 1, 0, 'C', True)
             self.ln()
@@ -681,11 +681,20 @@ if arquivo:
         status_text.success("📈 Calculando ranking...")
         progress_bar.progress(50)
 
-        # Ranking
+        # Ranking - CORRIGIDO para calcular percentual corretamente
         percentuais = []
+        questoes_unicas = gabarito['Questão'].unique()  # Usar questões únicas
+        
         for i, row in respostas_corr.iterrows():
-            acertos_tot = sum([row.get(f"Q{int(q)}_OK", False) for q in gabarito["Questão"]])
-            percentuais.append(acertos_tot / len(gabarito))
+            acertos_tot = 0
+            for questao in questoes_unicas:
+                col_ok = f"Q{int(questao)}_OK"
+                if col_ok in row and row[col_ok]:
+                    acertos_tot += 1
+            
+            percentual = acertos_tot / len(questoes_unicas) if len(questoes_unicas) > 0 else 0
+            percentuais.append(percentual)
+        
         respostas_corr["Percentual"] = percentuais
 
         ranking_df = respostas_corr[["ID", "Nome", "Percentual"]].sort_values("Percentual", ascending=False).reset_index(drop=True)
@@ -762,7 +771,8 @@ if arquivo:
         for disc, questoes in mapa_disciplinas.items():
             acertos = []
             for _, row in respostas_corr.iterrows():
-                acertos.append(sum([row.get(f"Q{int(q)}_OK", False) for q in questoes]) / len(questoes))
+                acertos_disc = sum([row.get(f"Q{int(q)}_OK", False) for q in questoes])
+                acertos.append(acertos_disc / len(questoes) if len(questoes) > 0 else 0)
             media_disciplinas.append((disc, round(np.mean(acertos)*100, 1)))
         media_df = pd.DataFrame(media_disciplinas, columns=["Disciplina", "%"])
         
@@ -792,8 +802,8 @@ if arquivo:
 
                     resultados = resultados_disciplina(aluno, mapa_disciplinas)
                     df_boletim = pd.DataFrame(resultados, columns=["Disciplina", "Acertos", "Total", "%"])
-                    df_boletim["Média Turma"] = media_df["%"]
-                    df_boletim["Diferença"] = (df_boletim["%"] - media_df["%"]).round(1)
+                    df_boletim["Media Turma"] = media_df["%"]
+                    df_boletim["Diferenca"] = (df_boletim["%"] - media_df["%"]).round(1)
 
                     # Gráficos
                     barras, radar, dist, rank = gerar_graficos(nome, posicao, percentual, df_boletim, media_df, ranking_df, tmpdir)
@@ -849,9 +859,9 @@ if arquivo:
 # Footer
 st.markdown("""
 <div class="footer">
-    <p><strong>🎓 Sistema Corretor ACAFE - Colégio Fleming</strong></p>
+    <p><strong>Corretor ACAFE - Colégio Fleming</strong></p>
     <p>Desenvolvido com ❤️ para facilitar a correção de simulados</p>
-    <p style="font-size: 0.8rem; opacity: 0.7;">Versão 2.0 - Interface Melhorada | Suporte a Línguas Estrangeiras</p>
+    <p style="font-size: 0.8rem; opacity: 0.7;">Versão 2.1 - Problemas Corrigidos | Cálculos Funcionais</p>
 </div>
 """, unsafe_allow_html=True)
 
