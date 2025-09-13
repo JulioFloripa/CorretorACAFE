@@ -188,7 +188,7 @@ if arquivo:
         with zipfile.ZipFile(zip_path, "w") as zipf:
             for i, aluno in respostas_corr.iterrows():
                 nome = aluno["Nome"].replace(" ", "_")
-                posicao = int(ranking_df[ranking_df["ID"] == aluno["ID"]]["Posição"])
+                posicao = int(ranking_df.loc[ranking_df["ID"] == aluno["ID"], "Posição"].iloc[0])
                 percentual = aluno["Percentual"] * 100
 
                 resultados = resultados_disciplina(aluno, mapa_disciplinas)
