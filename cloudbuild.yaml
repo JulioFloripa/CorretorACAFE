@@ -28,6 +28,10 @@ steps:
     - '900'
     - '--allow-unauthenticated'
 
+# Configuração de logs corrigida
+options:
+  logging: CLOUD_LOGGING_ONLY
+
 images:
   - 'gcr.io/$PROJECT_ID/corretor-acafe'
 
