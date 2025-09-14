@@ -1,0 +1,33 @@
+steps:
+  # Build da imagem
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/corretor-acafe', '.']
+  
+  # Push da imagem
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/corretor-acafe']
+  
+  # Deploy no Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+    - 'run'
+    - 'deploy'
+    - 'corretor-acafe'
+    - '--image'
+    - 'gcr.io/$PROJECT_ID/corretor-acafe'
+    - '--region'
+    - 'us-central1'
+    - '--platform'
+    - 'managed'
+    - '--memory'
+    - '4Gi'
+    - '--cpu'
+    - '2'
+    - '--timeout'
+    - '900'
+    - '--allow-unauthenticated'
+
+images:
+  - 'gcr.io/$PROJECT_ID/corretor-acafe'
+
